@@ -41,7 +41,7 @@ func TestAuthorizerCachesPermissionSetAfterRevalidatingToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !Allows(first, "cdphub.cust_intel.view") || Allows(first, "cdphub.aud_build.update") {
+	if !Allows(first, "cdphub.cust_intel.view") || Allows(first, "cdphub.other.view") {
 		t.Fatal("permission set authorized incorrect operation")
 	}
 	second, err := a.Authenticate(context.Background(), "token")

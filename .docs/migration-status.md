@@ -4,7 +4,7 @@ This repository has fresh Git history. The legacy `cdp-be` and `acs-cdp-be` chec
 
 ## Approved contract and release order
 
-The user confirmed `cdphub.cust_intel.view` for the new Customer Intelligence routes. The legacy OpenAPI and implementation use that tag; the plan's `acs_cdp.cust_intel.view` entry was only an example. The first release implements the first four rows below. Segment operations remain in the later release.
+The user confirmed `cdphub.cust_intel.view` for every Customer Intelligence and segment v0 route, including segment writes and exports for now. The plan's `acs_cdp.*` and `aud_build` entries were examples, not approved permission tags. The first release implements the first four rows below. Segment operations remain in the later release.
 
 | Method and path | Body or parameters | Response data | Permission | Current consumer and public URL |
 | --- | --- | --- | --- | --- |
@@ -12,13 +12,13 @@ The user confirmed `cdphub.cust_intel.view` for the new Customer Intelligence ro
 | `POST /api/v0/customer-intelligence/universe` | JSON `start_date`, `end_date`; nonblank dates rejected | latest chart dates, scopes, group, opcos, warnings | `cdphub.cust_intel.view` | CDP Hub; eco gateway path pending owner confirmation |
 | `GET /api/v0/internal/access` | Bearer token | `allowed: true` for accepted token | valid token; no operation grant | Internal access client; legacy gateway uses `/users` prefix; eco gateway path pending owner confirmation |
 | `POST /api/v0/internal/self-pilot/token` | Empty body or `{}` | token, type, expiry, profile | no caller grant; non-production and internal network only | Internal test clients; eco gateway path pending owner confirmation |
-| `GET /api/v0/segments/list` | `page`, `pageSize`, `search`, `tags` | segments, page, pageSize, total | `cdphub.aud_build.view` proposed, registration pending | CDP Hub; later release |
-| `GET /api/v0/segments/{id}` | segment ID | segment definition | `cdphub.aud_build.view` proposed, registration pending | CDP Hub; later release |
-| `POST /api/v0/segments` | name, tags, description, operation, filters | created segment | `cdphub.aud_build.create` proposed, registration pending | CDP Hub; later release |
-| `POST /api/v0/segments/requests` | mode and segment selections; `Idempotency-Key` for confirmation | estimate or request ID/status | `cdphub.aud_build.create` proposed, registration pending | CDP Hub; later release |
-| `GET /api/v0/segments/requests/{request_id}` | request ID | status and, when ready, counts and bucket | `cdphub.aud_build.view` proposed, registration pending | CDP Hub; later release |
+| `GET /api/v0/segments/list` | `page`, `pageSize`, `search`, `tags` | segments, page, pageSize, total | `cdphub.cust_intel.view` | CDP Hub; later release |
+| `GET /api/v0/segments/{id}` | segment ID | segment definition | `cdphub.cust_intel.view` | CDP Hub; later release |
+| `POST /api/v0/segments` | name, tags, description, operation, filters | created segment | `cdphub.cust_intel.view` | CDP Hub; later release |
+| `POST /api/v0/segments/requests` | mode and segment selections; `Idempotency-Key` for confirmation | estimate or request ID/status | `cdphub.cust_intel.view` | CDP Hub; later release |
+| `GET /api/v0/segments/requests/{request_id}` | request ID | status and, when ready, counts and bucket | `cdphub.cust_intel.view` | CDP Hub; later release |
 
-The route catalogs match these nine methods and paths. The legacy ContextIQ v0 OpenAPI omits `/api/v0/internal/access`; UserMS OpenAPI defines it. Segment OpenAPI still says only a valid bearer token is required and underspecifies body and response shapes. Resolve the segment permission and contract gaps before registering those routes. The first-release OpenAPI in this repository contains only registered v0 routes. Organization-level authorization is deferred. Segment writes require a stable UUID mapping from Partner Portal `sub` and object checks before that release; the current Partner Portal `sub` has not been verified as the required UUID.
+The route catalogs match these nine methods and paths. The legacy ContextIQ v0 OpenAPI omits `/api/v0/internal/access`; UserMS OpenAPI defines it. Segment OpenAPI still says only a valid bearer token is required and underspecifies body and response shapes; update those contract details before registering segment routes. The first-release OpenAPI in this repository contains only registered v0 routes. Organization-level authorization is deferred. Segment writes require a stable UUID mapping from Partner Portal `sub` and object checks before that release; the current Partner Portal `sub` has not been verified as the required UUID.
 
 ## Provenance and disposition
 

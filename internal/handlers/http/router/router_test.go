@@ -33,7 +33,7 @@ func TestProtectedRoutesDenyMissingAndWrongPermissions(t *testing.T) {
 			want         int
 		}{
 			{"missing token", "", nil, http.StatusUnauthorized},
-			{"wrong permission", "Bearer token", []string{"cdphub.aud_build.update"}, http.StatusForbidden},
+			{"wrong permission", "Bearer token", []string{"cdphub.other.view"}, http.StatusForbidden},
 			{"view permission", "Bearer token", []string{CustomerIntelligenceViewPermission}, http.StatusBadRequest},
 		} {
 			t.Run(path+"/"+tc.name, func(t *testing.T) {

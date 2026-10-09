@@ -20,6 +20,8 @@ Set:
 
 Then run `go run ./services/eco/cmd/server`. Protected requests validate RS256 JWT signature and claims and resolve effective permissions through Partner Portal introspection. The approved Customer Intelligence operation permission is `cdphub.cust_intel.view`; the literal `cdphub.*` grant also allows it. Cache lifetime bounds permission revocation delay. An expired JWT is revalidated and rejected before cache use.
 
+All planned segment v0 routes use `cdphub.cust_intel.view` for now, including writes and export requests. Those routes are not yet registered; they belong to the later segment release.
+
 For an isolated local/dev/UAT environment, set `APP_ENV=local`, `SELF_PILOT_ENABLED=true`, `SELF_PILOT_ISSUER=urn:eco-cdp-be:self-pilot:local`, and optionally `SELF_PILOT_TOKEN_TTL=1h`. Self-Pilot is disabled unless explicitly enabled and cannot run in production. Restrict its token route to an internal network in dev and UAT.
 
 Health: `GET /healthz`; readiness: `GET /readyz`. The v0 API contract is in [.docs/openapi-v0.yaml](.docs/openapi-v0.yaml).
