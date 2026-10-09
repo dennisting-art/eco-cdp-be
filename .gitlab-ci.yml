@@ -5,30 +5,22 @@ eco-cdp-be-pipeline:
   stage: build
   trigger:
     include:
-      - local: .gitlab/ci/eco-cdp-be.yml
+      - local: services/eco/ci/service.yml
     strategy: depend
   rules:
     - changes:
         - .gitlab-ci.yml
-        - .gitlab/ci/**/*
-        - Dockerfile
-        - Dockerfile.migrations
-        - go.mod
-        - go.sum
-        - pkg/**/*
-        - internal/**/*
         - services/**/*
-        - migrations/**/*
 
 migration-image-pipeline:
   stage: build
   trigger:
     include:
-      - local: .gitlab/ci/migrations.yml
+      - local: services/eco/ci/migrations.yml
     strategy: depend
   rules:
     - changes:
         - .gitlab-ci.yml
-        - .gitlab/ci/migrations.yml
-        - Dockerfile.migrations
-        - migrations/**/*
+        - services/eco/ci/migrations.yml
+        - services/eco/Dockerfile.migrations
+        - services/eco/migrations/**/*

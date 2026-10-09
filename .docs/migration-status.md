@@ -2,6 +2,8 @@
 
 This repository has fresh Git history. The legacy `cdp-be` and `acs-cdp-be` checkouts were read only. No legacy service is a build or runtime dependency.
 
+The eco service is self-contained under `services/eco/`: its Go module, internal packages, platform helpers, SQL, migrations, API contract, Dockerfiles, CI includes, and local scripts live there. Root `.gitlab-ci.yml` only triggers its child pipelines. The local synthetic seed at `services/eco/seed/` is ignored by Git.
+
 ## Approved contract and release order
 
 The user confirmed `cdphub.cust_intel.view` for every Customer Intelligence and segment v0 route, including segment writes and exports for now. The plan's `acs_cdp.*` and `aud_build` entries were examples, not approved permission tags. The first release implements the first four rows below. Segment operations remain in the later release.
@@ -26,7 +28,7 @@ User approval in this session covers adapting Customer Intelligence source and S
 
 | Material | Origin | Decision |
 | --- | --- | --- |
-| Cards and Universe domain, DTO, service, repository, SQL, HTTP handlers and mapper; service tests | `cdp-be/services/contextiq/internal/` | Adapted into `internal/`; imports, logging and module boundary changed. No other ContextIQ domains included. |
+| Cards and Universe domain, DTO, service, repository, SQL, HTTP handlers and mapper; service tests | `cdp-be/services/contextiq/internal/` | Adapted into `services/eco/internal/`; imports, logging and module boundary changed. No other ContextIQ domains included. |
 | Customer Intelligence schema, view, functions, trigger and matrix feature seed | `cdp-be/migrations/000057_contextiq_customer_intelligence_universe.{up,down}.sql` | Adapted as fresh `000001_customer_intelligence`. Includes only reporting schema. |
 | Synthetic Universe fixture | `cdp-be/scripts/seed_customer_intelligence_universe_local.sql` | Retained only under repository testdata; never production seed. |
 | First-release OpenAPI | `cdp-be/services/contextiq/docs/openapi-v0.yaml`, UserMS access spec | Adapted; removed segment routes and legacy server URLs, added access route. |

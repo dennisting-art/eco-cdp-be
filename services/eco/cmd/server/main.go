@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/internal/auth"
-	controller "gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/internal/handlers/http/controller"
-	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/internal/handlers/http/router"
-	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/internal/repository"
-	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/internal/selfpilot"
-	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/internal/service"
-	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/pkg/database"
+	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/auth"
+	controller "gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/handlers/http/controller"
+	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/handlers/http/router"
+	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/repository"
+	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/selfpilot"
+	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/service"
+	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/platform/database"
 )
 
 func main() {
