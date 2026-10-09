@@ -1,33 +1,31 @@
 # eco-cdp-be
 
-Independent v0 CDP backend. The `services/eco/` directory owns the Go module, implementation, migrations, Dockerfiles, CI includes, API contract, and service tools. The repository root contains only project-level orchestration and documentation. The first increment serves Customer Intelligence Cards and Universe, token access checks, and optional non-production Self-Pilot token issuance. Segment APIs and the confirmation worker are reserved for a later increment.
+Go backend for CDP Hub Customer Intelligence Cards and Universe APIs. The service and its build files live in [`services/eco/`](services/eco/).
 
-## Run
+## Local setup
 
-Requires Go 1.26 and a dedicated PostgreSQL database. Apply `services/eco/migrations/000001_customer_intelligence.up.sql` to that database with a migration runner. For an isolated local database, `services/eco/seed/local_customer_intelligence.sql` provides synthetic data; it is ignored by Git. Populate the Customer Intelligence reference and reporting tables from the approved data pipeline before expecting production chart results.
+Requires Go 1.26, Docker, and `psql`. From the repository root:
 
-Set:
+```sh
+docker run --name eco-cdp-postgres -e POSTGRES_USER=eco -e POSTGRES_PASSWORD=eco -e POSTGRES_DB=eco -p 5433:5432 -d postgres:16
+until docker exec eco-cdp-postgres pg_isready -U eco -d eco; do sleep 1; done
+export DATABASE_URL='postgres://eco:eco@localhost:5433/eco?sslmode=disable'
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f services/eco/migrations/000001_customer_intelligence.up.sql
+```
 
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | Dedicated PostgreSQL connection string |
-| `AUTH_ISSUER` | Exact Partner Portal JWT issuer |
-| `AUTH_JWKS_URL` | Partner Portal public JWKS URL |
-| `AUTH_AUDIENCE` | Required JWT audience |
-| `AUTH_INTROSPECTION_URL` | Token introspection URL with effective permissions |
-| `AUTH_CACHE_TTL` | Permission-set cache lifetime, default 30 seconds, maximum 1 minute |
-| `HTTP_ADDR` | HTTP listener, default `:8080` |
+For local Self-Pilot testing, set the required auth config and start the service:
 
-Then run `go -C services/eco run ./cmd/server`. Protected requests validate RS256 JWT signature and claims and resolve effective permissions through Partner Portal introspection. The approved Customer Intelligence operation permission is `cdphub.cust_intel.view`; the literal `cdphub.*` grant also allows it. Cache lifetime bounds permission revocation delay. An expired JWT is revalidated and rejected before cache use.
+```sh
+export AUTH_ISSUER='http://localhost:9999'
+export AUTH_JWKS_URL='http://localhost:9999/jwks'
+export AUTH_AUDIENCE='eco-cdp-be'
+export AUTH_INTROSPECTION_URL='http://localhost:9999/introspect'
+export APP_ENV=local SELF_PILOT_ENABLED=true SELF_PILOT_ISSUER='urn:eco-cdp-be:self-pilot:local'
+go -C services/eco run ./cmd/server
+```
 
-All planned segment v0 routes use `cdphub.cust_intel.view` for now, including writes and export requests. Those routes are not yet registered; they belong to the later segment release.
+The `localhost:9999` auth URLs are placeholders for Self-Pilot use only. Use real Partner Portal values to test Partner Portal tokens. In another terminal, check `curl http://localhost:8080/healthz` and request a local token with `curl -X POST http://localhost:8080/api/v0/internal/self-pilot/token`.
 
-For an isolated local/dev/UAT environment, set `APP_ENV=local`, `SELF_PILOT_ENABLED=true`, `SELF_PILOT_ISSUER=urn:eco-cdp-be:self-pilot:local`, and optionally `SELF_PILOT_TOKEN_TTL=1h`. Self-Pilot is disabled unless explicitly enabled and cannot run in production. Restrict its token route to an internal network in dev and UAT.
+If you have the ignored local seed file, load synthetic Cards and Universe data with `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f services/eco/seed/local_customer_intelligence.sql`. The seed is for a disposable database only.
 
-Health: `GET /healthz`; readiness: `GET /readyz`. The v0 API contract is in [services/eco/docs/openapi-v0.yaml](services/eco/docs/openapi-v0.yaml).
-
-## Verify
-
-`go -C services/eco test ./...` runs unit and contract tests. Set `ECO_TEST_DSN` to a disposable PostgreSQL database and run `go -C services/eco test ./internal/repository -run TestFreshCustomerIntelligenceMigration -count=1` to apply migration `000001` from scratch, load synthetic Universe data, and exercise Cards and Universe queries. Build either image with `docker build -f services/eco/Dockerfile services/eco` or `docker build -f services/eco/Dockerfile.migrations services/eco`.
-
-The route inventory, source provenance, remaining external decisions, and cutover gates are in [.docs/migration-status.md](.docs/migration-status.md).
+Run tests with `go -C services/eco test ./...`. The [API contract](services/eco/docs/openapi-v0.yaml) and [migration status](.docs/migration-status.md) have further detail.
