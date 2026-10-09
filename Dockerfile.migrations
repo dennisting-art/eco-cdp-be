@@ -1,0 +1,4 @@
+# syntax=docker/dockerfile:1
+FROM migrate/migrate:v4.19.1
+COPY migrations /migrations
+ENTRYPOINT ["migrate", "-path", "/migrations"]
