@@ -19,3 +19,16 @@ eco-cdp-be-pipeline:
         - internal/**/*
         - services/**/*
         - migrations/**/*
+
+migration-image-pipeline:
+  stage: build
+  trigger:
+    include:
+      - local: .gitlab/ci/migrations.yml
+    strategy: depend
+  rules:
+    - changes:
+        - .gitlab-ci.yml
+        - .gitlab/ci/migrations.yml
+        - Dockerfile.migrations
+        - migrations/**/*

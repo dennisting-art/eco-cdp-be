@@ -1,31 +1,11 @@
-variables:
-  IMAGE_NAME: eco-cdp-be
-
 include:
   - project: aeon360/internal/devsecops/dso-cicd
     ref: main
     file: templates/build/docker.yml
     inputs:
+      image_name: eco-cdp-be
       repository_name: repo-ecocdphub-svc
       file: Dockerfile
       context_path: "."
       dev_branch: develop
       uat_branch: staging
-
-migration-image:
-  image: docker:27-cli
-  services:
-    - docker:27-dind
-  stage: build
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
-  script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
-    - docker build -f Dockerfile.migrations -t "$CI_REGISTRY_IMAGE/eco-cdp-be-migrations:$CI_COMMIT_SHA" .
-    - docker push "$CI_REGISTRY_IMAGE/eco-cdp-be-migrations:$CI_COMMIT_SHA"
-  rules:
-    - changes:
-        - Dockerfile.migrations
-        - migrations/**/*
-        - .gitlab/ci/eco-cdp-be.yml
