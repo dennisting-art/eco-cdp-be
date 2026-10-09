@@ -1,0 +1,17 @@
+root = "."
+tmp_dir = "tmp/air/eco"
+env_files = [".env"]
+
+[build]
+cmd = "go build -o ./tmp/air/eco/eco ./cmd/server"
+entrypoint = ["./tmp/air/eco/eco"]
+include_ext = ["go", "sql", "toml"]
+exclude_dir = ["tmp", "vendor", "seed"]
+exclude_regex = ["_test\\.go"]
+exclude_unchanged = true
+stop_on_error = true
+send_interrupt = true
+kill_delay = 5000000000
+
+[misc]
+clean_on_exit = true
