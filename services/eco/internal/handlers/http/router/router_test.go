@@ -76,3 +76,23 @@ func TestAccessRouteAndNoLegacyRoutes(t *testing.T) {
 		}
 	}
 }
+
+func TestDocumentationRoutesArePublic(t *testing.T) {
+	r, err := New(Dependencies{Auth: authStub{}, Cards: controller.NewCardsHandler(nil), Universe: controller.NewUniverseHandler(nil), DB: dbStub{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		path, contentType, contains string
+	}{
+		{"/openapi.yaml", "application/yaml", "url: ./"},
+		{"/docs/openapi.yaml", "application/yaml", "url: ./"},
+		{"/docs/swagger-ui/", "text/html; charset=utf-8", `url: "../../openapi.yaml"`},
+	} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, tc.path, nil))
+		if w.Code != http.StatusOK || w.Header().Get("Content-Type") != tc.contentType || !strings.Contains(w.Body.String(), tc.contains) {
+			t.Fatalf("%s: status=%d content-type=%q body-match=%t", tc.path, w.Code, w.Header().Get("Content-Type"), strings.Contains(w.Body.String(), tc.contains))
+		}
+	}
+}

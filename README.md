@@ -15,6 +15,8 @@ make run-local
 
 Check `curl http://localhost:8092/healthz` or request a local token with `curl -X POST http://localhost:8092/api/v0/internal/self-pilot/token`. The sample auth URLs in `.env.example` are placeholders for Self-Pilot testing; use real Partner Portal values for Partner Portal tokens.
 
+OpenAPI is available at `http://localhost:8092/openapi.yaml`; Swagger UI is at `http://localhost:8092/docs/swagger-ui/`. The UI loads its JavaScript and CSS from a CDN. Deployed URLs require the gateway to forward those paths to this service.
+
 If the ignored local seed file exists and `psql` is installed, run `make -C services/eco seed-local` to load synthetic Cards and Universe data into the local database. Run tests with `make -C services/eco test`.
 
 See the [API contract](services/eco/docs/openapi-v0.yaml) and [migration status](.docs/migration-status.md) for further detail.

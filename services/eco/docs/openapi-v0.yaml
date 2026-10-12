@@ -4,8 +4,8 @@ info:
   version: 0.1.0
   description: eco-cdp-be Customer Intelligence v0 APIs and internal utilities.
 servers:
-  - url: http://localhost:8080
-  - url: http://eco-cdp-be:8080
+  - url: ./
+    description: Current host, including its gateway prefix when served through the gateway
 security:
   - bearerAuth: []
 paths:

@@ -14,11 +14,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/docs"
 	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/auth"
 	controller "gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/handlers/http/controller"
-	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/selfpilot"
 	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/platform/contextkeys"
 	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/platform/response"
+	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/selfpilot"
 )
 
 const CustomerIntelligenceViewPermission = "cdphub.cust_intel.view"
@@ -47,6 +48,9 @@ func New(d Dependencies) (*gin.Engine, error) {
 	}
 	r := gin.New()
 	r.Use(gin.Recovery(), requestContext())
+	r.GET("/openapi.yaml", func(c *gin.Context) { c.Data(http.StatusOK, "application/yaml", docs.OpenAPI) })
+	r.GET("/docs/openapi.yaml", func(c *gin.Context) { c.Data(http.StatusOK, "application/yaml", docs.OpenAPI) })
+	r.GET("/docs/swagger-ui/", func(c *gin.Context) { c.Data(http.StatusOK, "text/html; charset=utf-8", docs.SwaggerUI) })
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
 	r.GET("/readyz", func(c *gin.Context) {
 		if err := d.DB.Ping(c.Request.Context()); err != nil {

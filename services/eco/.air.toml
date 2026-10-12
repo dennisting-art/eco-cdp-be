@@ -5,7 +5,7 @@ env_files = [".env"]
 [build]
 cmd = "go build -o ./tmp/air/eco/eco ./cmd/server"
 entrypoint = ["./tmp/air/eco/eco"]
-include_ext = ["go", "sql", "toml"]
+include_ext = ["go", "sql", "toml", "yaml", "html"]
 exclude_dir = ["tmp", "vendor", "seed"]
 exclude_regex = ["_test\\.go"]
 exclude_unchanged = true
