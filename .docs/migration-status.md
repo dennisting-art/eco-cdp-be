@@ -30,6 +30,7 @@ User approval in this session covers adapting Customer Intelligence source and S
 | --- | --- | --- |
 | Cards and Universe domain, DTO, service, repository, SQL, HTTP handlers and mapper; service tests | `cdp-be/services/contextiq/internal/` | Adapted into `services/eco/internal/`; imports, logging and module boundary changed. No other ContextIQ domains included. |
 | Customer Intelligence schema, view, functions, trigger and matrix feature seed | `cdp-be/migrations/000057_contextiq_customer_intelligence_universe.{up,down}.sql` | Adapted as fresh `000001_customer_intelligence`. Includes only reporting schema. |
+| Customer Intelligence scopes, feature catalog, buckets and enablement | `cdp-be/migrations/000058_seed_ecosystem_scope_features.{up,down}.sql` | Adapted as `services/eco/migrations/000002_seed_ecosystem_scope_features`. The rollback retains `MEMBER_MATRIX_ACTIVITY` from `000001`. |
 | Synthetic Universe fixture | `cdp-be/scripts/seed_customer_intelligence_universe_local.sql` | Retained only under repository testdata; never production seed. |
 | First-release OpenAPI | `cdp-be/services/contextiq/docs/openapi-v0.yaml`, UserMS access spec | Adapted; removed segment routes and legacy server URLs, added access route. |
 | RS256/JWKS validator and its tests | `acs-cdp-be/services/custms/internal/auth/jwks_validator{,_test}.go` | Adapted; bearer token no longer sent to public JWKS; future `iat` rejected. |
@@ -37,11 +38,13 @@ User approval in this session covers adapting Customer Intelligence source and S
 | Permission lookup and cache | Partner Portal interface described by ACS auth integration reference | Rewritten; caches the full effective permission set by token hash, revalidates JWT on every request. |
 | `gin`, `pgx`, `uuid` | Existing dependencies in the reference repositories | Retained as direct Go module dependencies; module download uses public upstream modules, not legacy artifacts. |
 | `userms`, `taskms`, `eventms`, legacy `/api/v1`, segment schema and worker, customer-specific ACS schema/API | Legacy repositories | Excluded from first release. |
-| Production datasets, reference values, member cookbook, segment definitions, in-flight requests | Legacy database or upstream pipelines; ownership still unconfirmed | Excluded from repository. Migration and reconciliation are pending approved data owners. |
+| Production reporting facts, member cookbook, segment definitions, in-flight requests | Legacy database or upstream pipelines; ownership still unconfirmed | Excluded from repository. Migration and reconciliation are pending approved data owners. |
 
 ## Data and deployment gates
 
 `000001` creates these Customer Intelligence objects from an empty database: `ecosystem_scope`, `feature_summary`, `feature_bucket_dim`, `ecosystem_scope_feature`, `customer_daily_summary`, `member_daily_distribution`, `annual_member_acquisition`, `member_entity_daily`, `member_daily_summary`, `member_monthly_summary`, `transaction_daily_summary`, `vw_monthly_member_penetration`, and monthly summary ingestion functions and triggers. It creates no segment table. A disposable PostgreSQL 16 run applied it successfully; the integration test then loaded synthetic data and queried both domains.
+
+`000002` seeds five scopes, nine features, 28 buckets, and seven scope-feature enablements from the legacy reference migration. It contains no production reporting facts. The source uses `AMY` and `ADB`; the ignored local synthetic fixture uses `ACO` and `ABK`. Keep the source codes until the production scope mapping is confirmed, and do not treat the local fixture as the production catalog. The source also seeds `TIER` while the current Cards service recognizes `MBR_TIER`, and its MVC buckets differ from the current Cards summary rules. `TIER` has no scope assignment and MVC is disabled in this seed; align those contracts before enabling either feature. The down migration is intended for a fresh catalog before reporting facts reference these rows.
 
 The service and migration Docker images built locally from this repository. The service image started against the disposable database; readiness returned 200 and a Self-Pilot authenticated Universe request returned `status=complete`, four OpCo cards, and a matrix. This confirms a local smoke path only, not Partner Portal or public gateway behavior.
 

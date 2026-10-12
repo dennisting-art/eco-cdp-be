@@ -10,12 +10,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/domain"
-	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/service"
 	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/platform/database"
+	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/service"
 )
 
 // ECO_TEST_DSN must point to a disposable PostgreSQL database.
-func TestFreshCustomerIntelligenceMigration(t *testing.T) {
+func migrationTestPool(t *testing.T) (*pgxpool.Pool, context.Context) {
+	t.Helper()
 	dsn := os.Getenv("ECO_TEST_DSN")
 	if dsn == "" {
 		t.Skip("ECO_TEST_DSN is not set")
@@ -25,12 +26,12 @@ func TestFreshCustomerIntelligenceMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
+	t.Cleanup(admin.Close)
 	schema := "eco_test_" + strings.ReplaceAll(uuid.NewString(), "-", "")
 	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _, _ = admin.Exec(ctx, "DROP SCHEMA "+schema+" CASCADE") }()
+	t.Cleanup(func() { _, _ = admin.Exec(ctx, "DROP SCHEMA "+schema+" CASCADE") })
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -41,7 +42,12 @@ func TestFreshCustomerIntelligenceMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pool.Close()
+	t.Cleanup(pool.Close)
+	return pool, ctx
+}
+
+func TestFreshCustomerIntelligenceMigration(t *testing.T) {
+	pool, ctx := migrationTestPool(t)
 	for _, path := range []string{"../../migrations/000001_customer_intelligence.up.sql", "testdata/universe.sql"} {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -84,5 +90,51 @@ func TestFreshCustomerIntelligenceMigration(t *testing.T) {
 	}
 	if cards.ScopeCode != "AEON" || len(cards.Features) != 1 {
 		t.Fatalf("unexpected cards response: %#v", cards)
+	}
+}
+
+func TestReferenceSeedMigrationRoundTrip(t *testing.T) {
+	pool, ctx := migrationTestPool(t)
+	for _, path := range []string{
+		"../../migrations/000001_customer_intelligence.up.sql",
+		"../../migrations/000002_seed_ecosystem_scope_features.up.sql",
+		"../../migrations/000002_seed_ecosystem_scope_features.up.sql",
+	} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, string(data)); err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+	}
+	var scopes, features, buckets, associations int
+	err := pool.QueryRow(ctx, `SELECT
+		(SELECT count(*) FROM ecosystem_scope),
+		(SELECT count(*) FROM feature_summary),
+		(SELECT count(*) FROM feature_bucket_dim),
+		(SELECT count(*) FROM ecosystem_scope_feature)`).Scan(&scopes, &features, &buckets, &associations)
+	if err != nil || scopes != 5 || features != 9 || buckets != 28 || associations != 7 {
+		t.Fatalf("seed counts: scopes=%d features=%d buckets=%d associations=%d err=%v", scopes, features, buckets, associations, err)
+	}
+	var available bool
+	if err := pool.QueryRow(ctx, "SELECT is_available FROM ecosystem_scope WHERE scope_code = 'ADB'").Scan(&available); err != nil || available {
+		t.Fatalf("ADB availability=%t err=%v", available, err)
+	}
+	path := "../../migrations/000002_seed_ecosystem_scope_features.down.sql"
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, string(data)); err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	err = pool.QueryRow(ctx, `SELECT
+		(SELECT count(*) FROM ecosystem_scope),
+		(SELECT count(*) FROM feature_summary),
+		(SELECT count(*) FROM feature_bucket_dim),
+		(SELECT count(*) FROM ecosystem_scope_feature)`).Scan(&scopes, &features, &buckets, &associations)
+	if err != nil || scopes != 0 || features != 1 || buckets != 0 || associations != 0 {
+		t.Fatalf("rollback counts: scopes=%d features=%d buckets=%d associations=%d err=%v", scopes, features, buckets, associations, err)
 	}
 }
