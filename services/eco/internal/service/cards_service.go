@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/domain"
-	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/ports"
 	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/platform/contextkeys"
 	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/platform/logger"
 	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/platform/permission"
+	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/eco/internal/ports"
 )
 
 const defaultCardsScope = "AEON"
@@ -115,7 +115,7 @@ func buildCardsContext(ctx context.Context, scopeCode string, firstMonth, lastMo
 		var issue *cardsFeatureIssue
 		if (feature.Code == "ACTIVE_OPCO" && feature.Type != "TREND") ||
 			(feature.Code == "PENETRATION_OPCO" && feature.Type != "COMBO_TREND") ||
-			(feature.Code == "MBR_TIER" && feature.Type != "DISTRIBUTION") {
+			((feature.Code == "TIER" || feature.Code == "MBR_TIER") && feature.Type != "DISTRIBUTION") {
 			issue = invalidCardsFeature("incompatible_feature_type")
 		} else {
 			switch feature.Type {
@@ -276,11 +276,11 @@ func buildCardsDistribution(feature domain.CardsFeature, rows []domain.CardsDist
 }
 
 func buildMVCSummary(rows []domain.CardsDistributionRow) (map[string]domain.CardsSummaryMetric, bool) {
-	// These codes define the current MVC lifecycle stages. Additional buckets
-	// can be included in the total when configured, but these seven must exist.
+	// The reference catalog uses bucket 99 for unacquired members. It is
+	// displayed but excluded from the acquired-member summary denominator.
 	expectedGroups := map[string]string{
-		"1": "", "2": "", "3": "MVC_ACTIVE", "4": "MVC_ACTIVE",
-		"5": "MVC_ACTIVE", "6": "MVC_RISK", "7": "MVC_RISK",
+		"1": "", "2": "MVC_ACTIVE", "3": "MVC_ACTIVE", "4": "MVC_ACTIVE",
+		"5": "MVC_RISK", "6": "MVC_RISK", "99": "",
 	}
 	seen := make(map[string]bool, len(rows))
 	var total, active, risk int64
@@ -290,13 +290,13 @@ func buildMVCSummary(rows []domain.CardsDistributionRow) (map[string]domain.Card
 		}
 		seen[row.BucketCode] = true
 		group := strings.TrimSpace(row.RollupGroup)
-		if row.IsRollup != (group != "") {
+		if row.IsRollup != (group != "" || row.BucketCode == "99") {
 			return nil, false
 		}
 		if expected, known := expectedGroups[row.BucketCode]; known && group != expected {
 			return nil, false
 		}
-		if row.BucketCode != "1" {
+		if row.BucketCode != "99" {
 			if !addCardsCount(&total, *row.Count) {
 				return nil, false
 			}

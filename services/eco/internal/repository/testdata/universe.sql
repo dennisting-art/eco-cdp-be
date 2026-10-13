@@ -18,9 +18,9 @@ CREATE TEMP TABLE universe_seed_opcos (
 
 INSERT INTO universe_seed_opcos VALUES
     ('ABG', 'AEON BIG', 1, 1500000, 5500000, 4600000, '2026-09-27'),
-    ('ACO', 'AEON Co.', 2, 1900000, 6200000, 2900000, '2026-09-26'),
+    ('AMY', 'AEON CO', 2, 1900000, 6200000, 2900000, '2026-09-26'),
     ('ACSM', 'AEON Credit', 3, 800000, 2400000, 1450000, '2026-09-27'),
-    ('ABK', 'AEON Bank', 4, 450000, 980000, 510000, '2026-09-25');
+    ('ADB', 'AEON BANK', 4, 450000, 980000, 510000, '2026-09-25');
 
 INSERT INTO feature_summary (
     feature_code, display_name, description, display_order, feature_type, feature_context
@@ -30,45 +30,26 @@ VALUES (
     'Distribution of members by number of AEON entities used.',
     0, 'DISTRIBUTION', 'UNIVERSE'
 )
-ON CONFLICT (feature_code) DO UPDATE SET
-    display_name = EXCLUDED.display_name,
-    description = EXCLUDED.description,
-    display_order = EXCLUDED.display_order,
-    feature_type = EXCLUDED.feature_type,
-    feature_context = EXCLUDED.feature_context;
+ON CONFLICT (feature_code) DO NOTHING;
 
 INSERT INTO feature_bucket_dim (feature_code, bucket_code, display_name, display_order)
 VALUES ('ENT_CNT', 1, '1 Entity Only', 1),
        ('ENT_CNT', 2, '2 Entities', 2),
        ('ENT_CNT', 3, '3+ Entities', 3)
-ON CONFLICT (feature_code, bucket_code) DO UPDATE SET
-    display_name = EXCLUDED.display_name,
-    display_order = EXCLUDED.display_order;
+ON CONFLICT (feature_code, bucket_code) DO NOTHING;
 
 INSERT INTO ecosystem_scope (scope_code, scope_type, display_name, display_order, is_available)
 VALUES ('AEON', 'GROUP', 'AEON Group', 0, TRUE)
-ON CONFLICT (scope_code) DO UPDATE SET
-    scope_type = EXCLUDED.scope_type,
-    display_name = EXCLUDED.display_name,
-    display_order = EXCLUDED.display_order,
-    is_available = EXCLUDED.is_available,
-    updated_at = now();
+ON CONFLICT (scope_code) DO NOTHING;
 
 INSERT INTO ecosystem_scope_feature (scope_code, feature_code, is_enabled)
 VALUES ('AEON', 'MEMBER_MATRIX_ACTIVITY', TRUE)
-ON CONFLICT (scope_code, feature_code) DO UPDATE SET
-    is_enabled = EXCLUDED.is_enabled,
-    updated_at = now();
+ON CONFLICT (scope_code, feature_code) DO NOTHING;
 
 INSERT INTO ecosystem_scope (scope_code, scope_type, display_name, display_order, is_available)
 SELECT scope_code, 'OPCO', display_name, display_order, TRUE
 FROM universe_seed_opcos
-ON CONFLICT (scope_code) DO UPDATE SET
-    scope_type = EXCLUDED.scope_type,
-    display_name = EXCLUDED.display_name,
-    display_order = EXCLUDED.display_order,
-    is_available = EXCLUDED.is_available,
-    updated_at = now();
+ON CONFLICT (scope_code) DO NOTHING;
 
 -- Group and card snapshots deliberately have different latest dates.
 INSERT INTO customer_daily_summary (

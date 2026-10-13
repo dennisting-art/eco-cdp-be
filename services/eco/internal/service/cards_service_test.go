@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"strconv"
 	"testing"
 	"time"
 
@@ -51,7 +50,7 @@ func cardsFixture() domain.CardsSnapshot {
 		ScopeFound: true, ScopeAvailable: true,
 		Features: []domain.CardsFeature{
 			{Code: "ACTIVE_OPCO", Name: "Activity", Type: "TREND", Enabled: true},
-			{Code: "MBR_TIER", Name: "Tier", Type: "DISTRIBUTION", Enabled: true},
+			{Code: "TIER", Name: "Tier", Type: "DISTRIBUTION", Enabled: true},
 			{Code: "PENETRATION_OPCO", Name: "Penetration", Type: "COMBO_TREND", Enabled: true},
 			{Code: "MVC", Name: "Value Centre", Type: "DISTRIBUTION", Enabled: false},
 		},
@@ -65,7 +64,7 @@ func cardsFixture() domain.CardsSnapshot {
 			{Month: cardsDate("2026-09-01"), TotalSales: 1000, Percent100: 34},
 		},
 		Distributions: []domain.CardsDistributionRow{
-			{FeatureCode: "MBR_TIER", BucketCode: "4", Name: "4-Star", Date: &date, Count: cardsI64(0), Ratio: cardsF64(0)},
+			{FeatureCode: "TIER", BucketCode: "4", Name: "4-Star", Date: &date, Count: cardsI64(0), Ratio: cardsF64(0)},
 		},
 	}
 }
@@ -123,8 +122,8 @@ func TestCardsPartialFeatureFailures(t *testing.T) {
 	base.Distributions[0].Ratio = nil
 	out, err := buildCards("AEON", cardsDate("2026-04-01"), cardsDate("2026-09-01"), base)
 	if err != nil || out.Status != "partial" || len(out.Warnings) != 1 ||
-		out.Warnings[0].FeatureCode != "MBR_TIER" || out.Warnings[0].Code != "FEATURE_DATA_UNAVAILABLE" ||
-		cardsHasFeature(out, "MBR_TIER") {
+		out.Warnings[0].FeatureCode != "TIER" || out.Warnings[0].Code != "FEATURE_DATA_UNAVAILABLE" ||
+		cardsHasFeature(out, "TIER") {
 		t.Fatalf("expected omitted unavailable feature: %+v, %v", out, err)
 	}
 
@@ -141,7 +140,7 @@ func TestCardsPartialFeatureFailures(t *testing.T) {
 	base.Penetration[0].Percent100 = 120
 	out, err = buildCards("AEON", cardsDate("2026-04-01"), cardsDate("2026-09-01"), base)
 	if err != nil || len(out.Warnings) != 2 ||
-		out.Warnings[0].FeatureCode != "MBR_TIER" || out.Warnings[0].Code != "FEATURE_DATA_UNAVAILABLE" ||
+		out.Warnings[0].FeatureCode != "TIER" || out.Warnings[0].Code != "FEATURE_DATA_UNAVAILABLE" ||
 		out.Warnings[1].FeatureCode != "PENETRATION_OPCO" || out.Warnings[1].Code != "FEATURE_DATA_INVALID" {
 		t.Fatalf("expected ordered unavailable and invalid warnings: %+v, %v", out, err)
 	}
@@ -226,14 +225,15 @@ func TestCardsWindowUsesMalaysiaMonthBoundary(t *testing.T) {
 
 func mvcCardsFixture() domain.CardsSnapshot {
 	date := cardsDate("2026-09-24")
-	counts := []int64{10, 20, 30, 25, 15, 5, 5}
-	names := []string{"Unacquired", "New (0-12mo)", "Activated", "Engaged", "Loyal", "Declining", "Churned"}
-	groups := []string{"", "", "MVC_ACTIVE", "MVC_ACTIVE", "MVC_ACTIVE", "MVC_RISK", "MVC_RISK"}
+	counts := []int64{20, 20, 30, 20, 5, 5, 10}
+	codes := []string{"1", "2", "3", "4", "5", "6", "99"}
+	names := []string{"New", "Activated", "Engaged", "Loyal", "Declining", "Churned", "Unacquired"}
+	groups := []string{"", "MVC_ACTIVE", "MVC_ACTIVE", "MVC_ACTIVE", "MVC_RISK", "MVC_RISK", ""}
 	rows := make([]domain.CardsDistributionRow, 0, len(counts))
 	for i, count := range counts {
 		rows = append(rows, domain.CardsDistributionRow{
-			FeatureCode: "MVC", BucketCode: strconv.Itoa(i + 1), Name: names[i],
-			IsRollup: groups[i] != "", RollupGroup: groups[i],
+			FeatureCode: "MVC", BucketCode: codes[i], Name: names[i],
+			IsRollup: groups[i] != "" || codes[i] == "99", RollupGroup: groups[i],
 			Date: &date, Count: cardsI64(count), Ratio: cardsF64(0),
 		})
 	}
@@ -271,19 +271,24 @@ func TestCardsMVCSummary(t *testing.T) {
 
 func TestCardsMVCRejectsIncompleteOrInvalidGroups(t *testing.T) {
 	fixture := mvcCardsFixture()
-	fixture.Distributions = fixture.Distributions[:6]
+	fixture.Distributions = append(fixture.Distributions[:5], fixture.Distributions[6:]...)
 	if _, err := buildCards("AEON", cardsDate("2026-04-01"), cardsDate("2026-09-01"), fixture); !errors.Is(err, domain.ErrCardsInvalidData) {
 		t.Fatalf("missing Churned bucket: %v", err)
 	}
 	fixture = mvcCardsFixture()
-	fixture.Distributions[2].RollupGroup = "MVC_RISK"
+	fixture.Distributions[1].RollupGroup = "MVC_RISK"
 	if _, err := buildCards("AEON", cardsDate("2026-04-01"), cardsDate("2026-09-01"), fixture); !errors.Is(err, domain.ErrCardsInvalidData) {
 		t.Fatalf("misgrouped Activated bucket: %v", err)
 	}
 	fixture = mvcCardsFixture()
-	fixture.Distributions[5].Count = nil
+	fixture.Distributions[4].Count = nil
 	if _, err := buildCards("AEON", cardsDate("2026-04-01"), cardsDate("2026-09-01"), fixture); !errors.Is(err, domain.ErrCardsUnavailable) {
 		t.Fatalf("missing Declining count: %v", err)
+	}
+	fixture = mvcCardsFixture()
+	fixture.Distributions[6].IsRollup = false
+	if _, err := buildCards("AEON", cardsDate("2026-04-01"), cardsDate("2026-09-01"), fixture); !errors.Is(err, domain.ErrCardsInvalidData) {
+		t.Fatalf("Unacquired bucket must retain catalog rollup flag: %v", err)
 	}
 	fixture = mvcCardsFixture()
 	fixture.Features[0].Enabled = false

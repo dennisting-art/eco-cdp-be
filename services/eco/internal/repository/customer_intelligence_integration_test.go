@@ -138,3 +138,30 @@ func TestReferenceSeedMigrationRoundTrip(t *testing.T) {
 		t.Fatalf("rollback counts: scopes=%d features=%d buckets=%d associations=%d err=%v", scopes, features, buckets, associations, err)
 	}
 }
+
+func TestSyntheticUniverseFixturePreservesReferenceCatalog(t *testing.T) {
+	pool, ctx := migrationTestPool(t)
+	for _, path := range []string{
+		"../../migrations/000001_customer_intelligence.up.sql",
+		"../../migrations/000002_seed_ecosystem_scope_features.up.sql",
+		"testdata/universe.sql",
+	} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, string(data)); err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+	}
+	var scopes, aliases, unavailable, tier, legacyTier int
+	err := pool.QueryRow(ctx, `SELECT
+		(SELECT count(*) FROM ecosystem_scope),
+		(SELECT count(*) FROM ecosystem_scope WHERE scope_code IN ('ACO','ABK')),
+		(SELECT count(*) FROM ecosystem_scope WHERE scope_code IN ('ACSM','ADB') AND is_available = FALSE),
+		(SELECT count(*) FROM feature_summary WHERE feature_code = 'TIER'),
+		(SELECT count(*) FROM feature_summary WHERE feature_code = 'MBR_TIER')`).Scan(&scopes, &aliases, &unavailable, &tier, &legacyTier)
+	if err != nil || scopes != 5 || aliases != 0 || unavailable != 2 || tier != 1 || legacyTier != 0 {
+		t.Fatalf("catalog changed by fixture: scopes=%d aliases=%d unavailable=%d tier=%d legacyTier=%d err=%v", scopes, aliases, unavailable, tier, legacyTier, err)
+	}
+}
