@@ -1,0 +1,17 @@
+root = "."
+tmp_dir = "tmp/air/ecodai"
+env_files = [".env"]
+
+[build]
+cmd = "go build -o ./tmp/air/ecodai/ecodai ./cmd/server"
+entrypoint = ["./tmp/air/ecodai/ecodai"]
+include_ext = ["go", "sql", "toml", "yaml", "html"]
+exclude_dir = ["tmp", "vendor", "seed"]
+exclude_regex = ["_test\\.go"]
+exclude_unchanged = true
+stop_on_error = true
+send_interrupt = true
+kill_delay = 5000000000
+
+[misc]
+clean_on_exit = true

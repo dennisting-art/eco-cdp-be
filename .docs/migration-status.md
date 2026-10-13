@@ -2,7 +2,7 @@
 
 This repository has fresh Git history. The legacy `cdp-be` and `acs-cdp-be` checkouts were read only. No legacy service is a build or runtime dependency.
 
-The eco service is self-contained under `services/eco/`: its Go module, internal packages, platform helpers, SQL, migrations, API contract, Dockerfiles, CI includes, and local scripts live there. Root `.gitlab-ci.yml` only triggers its child pipelines. The local synthetic seed at `services/eco/seed/` is ignored by Git.
+The ecodai service is self-contained under `services/ecodai/`: its Go module, internal packages, platform helpers, SQL, migrations, API contract, Dockerfiles, CI includes, and local scripts live there. Root `.gitlab-ci.yml` only triggers its child pipelines. The local synthetic seed at `services/ecodai/seed/` is ignored by Git.
 
 ## Approved contract and release order
 
@@ -10,10 +10,10 @@ The user confirmed `cdphub.cust_intel.view` for every Customer Intelligence and 
 
 | Method and path | Body or parameters | Response data | Permission | Current consumer and public URL |
 | --- | --- | --- | --- | --- |
-| `POST /api/v0/customer-intelligence/cards` | JSON `scope_code`; omitted, null, or empty selects AEON | status, warnings, scope_code, configured features | `cdphub.cust_intel.view` | CDP Hub; legacy dev/UAT gateway uses `/contextiq` prefix; eco gateway path pending owner confirmation |
-| `POST /api/v0/customer-intelligence/universe` | JSON `start_date`, `end_date`; nonblank dates rejected | latest chart dates, scopes, group, opcos, warnings | `cdphub.cust_intel.view` | CDP Hub; eco gateway path pending owner confirmation |
-| `GET /api/v0/internal/access` | Bearer token | `allowed: true` for accepted token | valid token; no operation grant | Internal access client; legacy gateway uses `/users` prefix; eco gateway path pending owner confirmation |
-| `POST /api/v0/internal/self-pilot/token` | Empty body or `{}` | token, type, expiry, profile | no caller grant; non-production and internal network only | Internal test clients; eco gateway path pending owner confirmation |
+| `POST /api/v0/customer-intelligence/cards` | JSON `scope_code`; omitted, null, or empty selects AEON | status, warnings, scope_code, configured features | `cdphub.cust_intel.view` | CDP Hub; legacy dev/UAT gateway uses `/contextiq` prefix; ecodai gateway path pending owner confirmation |
+| `POST /api/v0/customer-intelligence/universe` | JSON `start_date`, `end_date`; nonblank dates rejected | latest chart dates, scopes, group, opcos, warnings | `cdphub.cust_intel.view` | CDP Hub; ecodai gateway path pending owner confirmation |
+| `GET /api/v0/internal/access` | Bearer token | `allowed: true` for accepted token | valid token; no operation grant | Internal access client; legacy gateway uses `/users` prefix; ecodai gateway path pending owner confirmation |
+| `POST /api/v0/internal/self-pilot/token` | Empty body or `{}` | token, type, expiry, profile | no caller grant; non-production and internal network only | Internal test clients; ecodai gateway path pending owner confirmation |
 | `GET /api/v0/segments/list` | `page`, `pageSize`, `search`, `tags` | segments, page, pageSize, total | `cdphub.cust_intel.view` | CDP Hub; later release |
 | `GET /api/v0/segments/{id}` | segment ID | segment definition | `cdphub.cust_intel.view` | CDP Hub; later release |
 | `POST /api/v0/segments` | name, tags, description, operation, filters | created segment | `cdphub.cust_intel.view` | CDP Hub; later release |
@@ -28,9 +28,9 @@ User approval in this session covers adapting Customer Intelligence source and S
 
 | Material | Origin | Decision |
 | --- | --- | --- |
-| Cards and Universe domain, DTO, service, repository, SQL, HTTP handlers and mapper; service tests | `cdp-be/services/contextiq/internal/` | Adapted into `services/eco/internal/`; imports, logging and module boundary changed. No other ContextIQ domains included. |
+| Cards and Universe domain, DTO, service, repository, SQL, HTTP handlers and mapper; service tests | `cdp-be/services/contextiq/internal/` | Adapted into `services/ecodai/internal/`; imports, logging and module boundary changed. No other ContextIQ domains included. |
 | Customer Intelligence schema, view, functions, trigger and matrix feature seed | `cdp-be/migrations/000057_contextiq_customer_intelligence_universe.{up,down}.sql` | Adapted as fresh `000001_customer_intelligence`. Includes only reporting schema. |
-| Customer Intelligence scopes, feature catalog, buckets and enablement | `cdp-be/migrations/000058_seed_ecosystem_scope_features.{up,down}.sql` | Adapted as `services/eco/migrations/000002_seed_ecosystem_scope_features`. The rollback retains `MEMBER_MATRIX_ACTIVITY` from `000001`. |
+| Customer Intelligence scopes, feature catalog, buckets and enablement | `cdp-be/migrations/000058_seed_ecosystem_scope_features.{up,down}.sql` | Adapted as `services/ecodai/migrations/000002_seed_ecosystem_scope_features`. The rollback retains `MEMBER_MATRIX_ACTIVITY` from `000001`. |
 | Synthetic Universe fixture | `cdp-be/scripts/seed_customer_intelligence_universe_local.sql` | Retained only under repository testdata; never production seed. |
 | First-release OpenAPI | `cdp-be/services/contextiq/docs/openapi-v0.yaml`, UserMS access spec | Adapted; removed segment routes and legacy server URLs, added access route. |
 | RS256/JWKS validator and its tests | `acs-cdp-be/services/custms/internal/auth/jwks_validator{,_test}.go` | Adapted; bearer token no longer sent to public JWKS; future `iat` rejected. |
@@ -52,7 +52,7 @@ The repository only contains local synthetic scripts for Customer Intelligence; 
 
 The external gateway configuration is in `cdp-k8s-manifests/overlays/{dev,uat,prep,prod}/kong-ingress/cdphub-service.yml`. The ingress currently routes `/contextiq` and `/users` by broad prefixes to legacy services and strips the matched path. Its `CODEOWNERS` assigns ingress changes to `@akmal.harith`. A new rule must preserve the public v0 path and the service's `/api/v0/...` upstream path without stealing legacy `/api/v1` traffic. No gateway file was changed.
 
-The eco app serves `GET /openapi.yaml`, `GET /docs/openapi.yaml`, and `GET /docs/swagger-ui/` without a token. The OpenAPI server URL is relative to the spec, so Swagger UI uses the current host and gateway prefix. The external eco gateway prefix is still unconfirmed; these documentation paths need forwarding when it is configured.
+The ecodai app serves `GET /openapi.yaml`, `GET /docs/openapi.yaml`, and `GET /docs/swagger-ui/` without a token. The OpenAPI server URL is relative to the spec, so Swagger UI uses the current host and gateway prefix. The external ecodai gateway prefix is still unconfirmed; these documentation paths need forwarding when it is configured.
 
 The service and migration child pipelines both include `dso-cicd/templates/build/docker.yml`, inspected at revision `b57cf491a54e4fd4c70a8a5fa3d3010ac40fd3ee`. The template publishes to GCP Artifact Registry and expects `repo-ecocdphub-svc` to exist in `prj-cmn-svc-3c`; that repository and runner access are not provisioned yet. Its default-branch job promotes a staging image rather than building one, so bootstrap the new GitLab project by building `develop` and `staging` before running the first `main` release pipeline. Do the same for both child pipelines.
 

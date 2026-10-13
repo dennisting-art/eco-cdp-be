@@ -1,0 +1,11 @@
+include:
+  - project: aeon360/internal/devsecops/dso-cicd
+    ref: main
+    file: templates/build/docker.yml
+    inputs:
+      image_name: ecodai-migrations
+      repository_name: repo-ecocdphub-svc
+      file: services/ecodai/Dockerfile.migrations
+      context_path: "services/ecodai"
+      dev_branch: develop
+      uat_branch: staging

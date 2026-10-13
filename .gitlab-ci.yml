@@ -1,11 +1,11 @@
 stages:
   - build
 
-eco-cdp-be-pipeline:
+ecodai-pipeline:
   stage: build
   trigger:
     include:
-      - local: services/eco/ci/service.yml
+      - local: services/ecodai/ci/service.yml
     strategy: depend
   rules:
     - changes:
@@ -16,11 +16,11 @@ migration-image-pipeline:
   stage: build
   trigger:
     include:
-      - local: services/eco/ci/migrations.yml
+      - local: services/ecodai/ci/migrations.yml
     strategy: depend
   rules:
     - changes:
         - .gitlab-ci.yml
-        - services/eco/ci/migrations.yml
-        - services/eco/Dockerfile.migrations
-        - services/eco/migrations/**/*
+        - services/ecodai/ci/migrations.yml
+        - services/ecodai/Dockerfile.migrations
+        - services/ecodai/migrations/**/*
