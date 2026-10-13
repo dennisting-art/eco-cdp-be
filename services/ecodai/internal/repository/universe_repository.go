@@ -54,6 +54,10 @@ func (r *universeRepository) GetLatestCharts(ctx context.Context) (snap domain.U
 	if err != nil {
 		return snap, universeQueryError(ctx, "GetUniverseMatrixFeatureEnabled", err)
 	}
+	snap.EntityCountEnabled, err = q.GetUniverseEntityCountFeatureEnabled(ctx, groupCode)
+	if err != nil {
+		return snap, universeQueryError(ctx, "GetUniverseEntityCountFeatureEnabled", err)
+	}
 
 	scopes, err := q.ListUniverseOpcoScopes(ctx)
 	if err != nil {

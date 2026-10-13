@@ -43,7 +43,7 @@ VALUES ('AEON', 'GROUP', 'AEON Group', 0, TRUE)
 ON CONFLICT (scope_code) DO NOTHING;
 
 INSERT INTO ecosystem_scope_feature (scope_code, feature_code, is_enabled)
-VALUES ('AEON', 'MEMBER_MATRIX_ACTIVITY', TRUE)
+VALUES ('AEON', 'MEMBER_MATRIX_ACTIVITY', TRUE), ('AEON', 'ENT_CNT', TRUE)
 ON CONFLICT (scope_code, feature_code) DO NOTHING;
 
 INSERT INTO ecosystem_scope (scope_code, scope_type, display_name, display_order, is_available)

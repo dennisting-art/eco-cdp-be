@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	// Static reads for the Customer Intelligence Cards endpoint.
 	GetCardsScope(ctx context.Context, scopeCode string) (GetCardsScopeRow, error)
+	GetUniverseEntityCountFeatureEnabled(ctx context.Context, scopeCode string) (bool, error)
 	// Static read queries for the Customer Intelligence Universe endpoint.
 	GetUniverseGroupScope(ctx context.Context) (string, error)
 	GetUniverseLatestMatrixDate(ctx context.Context, scopeCode string) (pgtype.Date, error)

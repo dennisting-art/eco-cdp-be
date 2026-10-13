@@ -26,7 +26,9 @@ paths:
         Valid enabled features remain available when another independent
         feature is unavailable or invalid. Such responses use status
         `partial`, omit the failed feature, and include a warning identifying
-        it. Disabled features remain present. Database and request-level
+        it. Features are keyed by lowercase feature code. Disabled features
+        remain present with `is_enabled: false` and `data: null`. The
+        `display_order` field preserves the configured feature order. Database and request-level
         failures still reject the whole request.
       requestBody:
         required: true
@@ -70,10 +72,14 @@ paths:
         matrix snapshot, even when their detail view is unavailable. Every directed
         relationship and primary total is required. When the feature is disabled,
         the matrix is null without a data warning. Disabled Op-Co cards have null
-        counts and date.
+        data and date.
         Valid charts remain available when another independent chart is missing or invalid.
-        Such responses use status `partial`, return null for the failed chart, and include
-        a warning. A response with no usable chart returns an error.
+        Such responses use status `partial`, set failed chart data to null, and include
+        a warning. Each chart has `is_enabled` and `data`; unconfigured group
+        charts are enabled by default, while the entity count distribution,
+        matrix, and Op-Co cards use
+        their configured enablement. Disabled or unavailable chart data is null;
+        warnings distinguish unavailable data. A response with no usable chart returns an error.
       requestBody:
         required: true
         content:
@@ -175,23 +181,36 @@ components:
         compare: {type: integer, format: int64, description: Optional comparison count when a comparison period is defined}
     CardsFeature:
       type: object
-      required: [feature_code, display_name, type, is_enabled]
+      required: [feature_code, display_name, type, display_order, is_enabled, data]
       properties:
         feature_code: {type: string}
         display_name: {type: string}
         type: {type: string, enum: [TREND, DISTRIBUTION, COMBO_TREND]}
+        display_order: {type: integer, description: One-based position in the configured response order}
         is_enabled: {type: boolean}
-        trend:
-          type: array
-          description: Present for TREND or COMBO_TREND; [] when disabled.
-          items:
-            oneOf:
-              - {$ref: '#/components/schemas/CardsActivityPoint'}
-              - {$ref: '#/components/schemas/CardsMetricPoint'}
-        buckets:
-          type: array
-          description: Present for DISTRIBUTION; [] when disabled.
-          items: {$ref: '#/components/schemas/CardsMetricPoint'}
+        data:
+          type: object
+          nullable: true
+          description: Null when disabled; otherwise the shape matching the feature type.
+          anyOf:
+            - {$ref: '#/components/schemas/CardsTrendData'}
+            - {$ref: '#/components/schemas/CardsComboTrendData'}
+            - {$ref: '#/components/schemas/CardsDistributionData'}
+    CardsTrendData:
+      type: object
+      required: [points]
+      properties:
+        points: {type: array, items: {$ref: '#/components/schemas/CardsActivityPoint'}}
+    CardsComboTrendData:
+      type: object
+      required: [points]
+      properties:
+        points: {type: array, items: {$ref: '#/components/schemas/CardsMetricPoint'}}
+    CardsDistributionData:
+      type: object
+      required: [buckets]
+      properties:
+        buckets: {type: array, items: {$ref: '#/components/schemas/CardsMetricPoint'}}
         summary:
           type: object
           description: Present for enabled MVC; keyed by total_members, active_members, and at_risk_customers. Other features omit it.
@@ -214,9 +233,9 @@ components:
           items: {$ref: '#/components/schemas/CardsWarning'}
         scope_code: {type: string}
         features:
-          type: array
-          description: Successful enabled features and all disabled features in configured order.
-          items: {$ref: '#/components/schemas/CardsFeature'}
+          type: object
+          description: Successful enabled features and all disabled features, keyed by lowercase feature code.
+          additionalProperties: {$ref: '#/components/schemas/CardsFeature'}
     UniverseRequest:
       type: object
       additionalProperties: false
@@ -241,17 +260,45 @@ components:
         display_name: {type: string}
     UniverseOpco:
       type: object
-      required: [scope_code, is_enabled, total_retail_count, member, non_member]
+      required: [scope_code, is_enabled, data]
       properties:
         scope_code: {type: string}
         is_enabled: {type: boolean}
+        data:
+          type: object
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/UniverseOpcoData'}]
+    UniverseOpcoData:
+      type: object
+      required: [total_retail_count, member, non_member]
+      properties:
         total_retail_count: {type: integer, format: int64, nullable: true}
-        member:
-          nullable: true
-          allOf: [{$ref: '#/components/schemas/UniverseMetric'}]
-        non_member:
-          nullable: true
-          allOf: [{$ref: '#/components/schemas/UniverseMetric'}]
+        member: {$ref: '#/components/schemas/UniverseMetric'}
+        non_member: {$ref: '#/components/schemas/UniverseMetric'}
+    UniverseMetricChart:
+      type: object
+      required: [is_enabled, data]
+      properties:
+        is_enabled: {type: boolean}
+        data: {type: object, nullable: true, allOf: [{$ref: '#/components/schemas/UniverseMetric'}]}
+    UniverseMetricListChart:
+      type: object
+      required: [is_enabled, data]
+      properties:
+        is_enabled: {type: boolean}
+        data: {type: array, nullable: true, items: {$ref: '#/components/schemas/UniverseMetric'}}
+    UniverseActivity:
+      type: object
+      required: [active, inactive]
+      properties:
+        active: {$ref: '#/components/schemas/UniverseMetric'}
+        inactive: {$ref: '#/components/schemas/UniverseMetric'}
+    UniverseActivityChart:
+      type: object
+      required: [is_enabled, data]
+      properties:
+        is_enabled: {type: boolean}
+        data: {type: object, nullable: true, allOf: [{$ref: '#/components/schemas/UniverseActivity'}]}
     UniverseMatrix:
       type: object
       required: [columns, rows]
@@ -265,6 +312,12 @@ components:
             properties:
               primary_entity: {$ref: '#/components/schemas/UniverseMetric'}
               relationships: {type: array, items: {$ref: '#/components/schemas/UniverseMetric'}}
+    UniverseMatrixChart:
+      type: object
+      required: [is_enabled, data]
+      properties:
+        is_enabled: {type: boolean}
+        data: {type: object, nullable: true, allOf: [{$ref: '#/components/schemas/UniverseMatrix'}]}
     UniverseResponse:
       type: object
       required: [status, warnings, as_of_date, as_of_dates, scopes, group, opcos]
@@ -284,19 +337,14 @@ components:
           type: object
           required: [total_members, latest_member_growth, member_activity, member_penetration_retail, non_member_transaction_retail, annual_member_acquisition, entity_member_count, member_matrix_activity]
           properties:
-            total_members: {nullable: true, allOf: [{$ref: '#/components/schemas/UniverseMetric'}]}
-            latest_member_growth: {nullable: true, allOf: [{$ref: '#/components/schemas/UniverseMetric'}]}
-            member_activity:
-              type: object
-              nullable: true
-              properties:
-                active: {$ref: '#/components/schemas/UniverseMetric'}
-                inactive: {$ref: '#/components/schemas/UniverseMetric'}
-            member_penetration_retail: {nullable: true, allOf: [{$ref: '#/components/schemas/UniverseMetric'}]}
-            non_member_transaction_retail: {nullable: true, allOf: [{$ref: '#/components/schemas/UniverseMetric'}]}
-            annual_member_acquisition: {type: array, nullable: true, items: {$ref: '#/components/schemas/UniverseMetric'}}
-            entity_member_count: {type: array, nullable: true, items: {$ref: '#/components/schemas/UniverseMetric'}}
-            member_matrix_activity: {nullable: true, allOf: [{$ref: '#/components/schemas/UniverseMatrix'}]}
+            total_members: {$ref: '#/components/schemas/UniverseMetricChart'}
+            latest_member_growth: {$ref: '#/components/schemas/UniverseMetricChart'}
+            member_activity: {$ref: '#/components/schemas/UniverseActivityChart'}
+            member_penetration_retail: {$ref: '#/components/schemas/UniverseMetricChart'}
+            non_member_transaction_retail: {$ref: '#/components/schemas/UniverseMetricChart'}
+            annual_member_acquisition: {$ref: '#/components/schemas/UniverseMetricListChart'}
+            entity_member_count: {$ref: '#/components/schemas/UniverseMetricListChart'}
+            member_matrix_activity: {$ref: '#/components/schemas/UniverseMatrixChart'}
         opcos: {type: array, items: {$ref: '#/components/schemas/UniverseOpco'}}
     UniverseWarning:
       type: object

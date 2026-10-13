@@ -33,20 +33,29 @@ type UniverseMatrix struct {
 	Rows    []UniverseMatrixRow `json:"rows"`
 }
 
+type UniverseChart[T any] struct {
+	IsEnabled bool `json:"is_enabled"`
+	Data      *T   `json:"data"`
+}
+
 type UniverseGroup struct {
-	TotalMembers               *UniverseMetric   `json:"total_members"`
-	LatestMemberGrowth         *UniverseMetric   `json:"latest_member_growth"`
-	MemberActivity             *UniverseActivity `json:"member_activity"`
-	MemberPenetrationRetail    *UniverseMetric   `json:"member_penetration_retail"`
-	NonMemberTransactionRetail *UniverseMetric   `json:"non_member_transaction_retail"`
-	AnnualMemberAcquisition    []UniverseMetric  `json:"annual_member_acquisition"`
-	EntityMemberCount          []UniverseMetric  `json:"entity_member_count"`
-	MemberMatrixActivity       *UniverseMatrix   `json:"member_matrix_activity"`
+	TotalMembers               UniverseChart[UniverseMetric]   `json:"total_members"`
+	LatestMemberGrowth         UniverseChart[UniverseMetric]   `json:"latest_member_growth"`
+	MemberActivity             UniverseChart[UniverseActivity] `json:"member_activity"`
+	MemberPenetrationRetail    UniverseChart[UniverseMetric]   `json:"member_penetration_retail"`
+	NonMemberTransactionRetail UniverseChart[UniverseMetric]   `json:"non_member_transaction_retail"`
+	AnnualMemberAcquisition    UniverseChart[[]UniverseMetric] `json:"annual_member_acquisition"`
+	EntityMemberCount          UniverseChart[[]UniverseMetric] `json:"entity_member_count"`
+	MemberMatrixActivity       UniverseChart[UniverseMatrix]   `json:"member_matrix_activity"`
 }
 
 type UniverseOpco struct {
-	ScopeCode        string          `json:"scope_code"`
-	IsEnabled        bool            `json:"is_enabled"`
+	ScopeCode string            `json:"scope_code"`
+	IsEnabled bool              `json:"is_enabled"`
+	Data      *UniverseOpcoData `json:"data"`
+}
+
+type UniverseOpcoData struct {
 	TotalRetailCount *int64          `json:"total_retail_count"`
 	Member           *UniverseMetric `json:"member"`
 	NonMember        *UniverseMetric `json:"non_member"`

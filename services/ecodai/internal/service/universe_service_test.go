@@ -41,12 +41,13 @@ func fixtureUniverse() domain.UniverseSnapshot {
 		return domain.UniverseSummary{Date: ud(date), TotalMembers: u64(members), ActiveMembers: u64(members / 2), InactiveMembers: u64(members - members/2), TotalRetail: u64(retail), RetailMembers: u64(retail / 2), RetailNonMembers: u64(retail - retail/2)}
 	}
 	return domain.UniverseSnapshot{
-		GroupConfigured: true,
-		GroupCode:       "AEON_GROUP",
-		MatrixEnabled:   true,
-		Scopes:          []domain.UniverseScope{{Code: "B", Name: "Beta", Enabled: true}, {Code: "A", Name: "Alpha", Enabled: true}, {Code: "X", Name: "Disabled", Enabled: false}},
-		Summaries:       map[string]domain.UniverseSummary{"AEON_GROUP": summary("2026-03-31", 1000, 100), "A": summary("2026-03-25", 100, 10), "B": summary("2026-04-01", 200, 20)},
-		AcquisitionDate: ud("2026-03-30"), Acquisition: []domain.UniverseAcquisition{{Year: 2026, NewMembers: 50, Compare: u64(-50)}, {Year: 2025, NewMembers: 100}},
+		GroupConfigured:    true,
+		GroupCode:          "AEON_GROUP",
+		MatrixEnabled:      true,
+		EntityCountEnabled: true,
+		Scopes:             []domain.UniverseScope{{Code: "B", Name: "Beta", Enabled: true}, {Code: "A", Name: "Alpha", Enabled: true}, {Code: "X", Name: "Disabled", Enabled: false}},
+		Summaries:          map[string]domain.UniverseSummary{"AEON_GROUP": summary("2026-03-31", 1000, 100), "A": summary("2026-03-25", 100, 10), "B": summary("2026-04-01", 200, 20)},
+		AcquisitionDate:    ud("2026-03-30"), Acquisition: []domain.UniverseAcquisition{{Year: 2026, NewMembers: 50, Compare: u64(-50)}, {Year: 2025, NewMembers: 100}},
 		DistributionDate: ud("2026-03-29"), Buckets: []domain.UniverseBucket{{Code: "1", Name: "1 Entity Only", Count: u64(2), Ratio: uf(0.2)}, {Code: "2", Name: "2 Entities", Count: u64(0), Ratio: uf(0)}, {Code: "3", Name: "3+ Entities", Count: u64(8), Ratio: uf(0.8)}},
 		MatrixDate: ud("2026-03-28"), MatrixTotals: map[string]*int64{"A": u64(90), "B": u64(180)},
 		Cells: []domain.UniverseCell{{Primary: "A", Related: "A", Count: 90, Ratio: 1}, {Primary: "A", Related: "B", Count: 10, Ratio: 0.1}, {Primary: "B", Related: "A", Count: 20, Ratio: 0.2}, {Primary: "B", Related: "B", Count: 180, Ratio: 1}},
@@ -224,6 +225,15 @@ func TestUniverseDisabledMatrixFeatureHasNoWarning(t *testing.T) {
 	out, err := buildUniverse(s)
 	if err != nil || out.Group.MemberMatrixActivity != nil || out.AsOfDates.Group["member_matrix_activity"] != nil || out.Status != "complete" || len(out.Warnings) != 0 {
 		t.Fatalf("disabled group matrix feature: %+v, %v", out, err)
+	}
+}
+
+func TestUniverseDisabledEntityCountFeatureHasNoWarning(t *testing.T) {
+	s := fixtureUniverse()
+	s.EntityCountEnabled = false
+	out, err := buildUniverse(s)
+	if err != nil || out.Group.EntityMemberCount != nil || out.AsOfDates.Group["entity_member_count"] != nil || out.Status != "complete" || len(out.Warnings) != 0 {
+		t.Fatalf("disabled entity count feature: %+v, %v", out, err)
 	}
 }
 

@@ -48,19 +48,20 @@ type UniverseCell struct {
 }
 
 type UniverseSnapshot struct {
-	InvalidCharts    map[string]string
-	GroupConfigured  bool
-	GroupCode        string
-	MatrixEnabled    bool
-	Scopes           []UniverseScope
-	Summaries        map[string]UniverseSummary
-	AcquisitionDate  time.Time
-	Acquisition      []UniverseAcquisition
-	DistributionDate time.Time
-	Buckets          []UniverseBucket
-	MatrixDate       time.Time
-	Cells            []UniverseCell
-	MatrixTotals     map[string]*int64
+	InvalidCharts      map[string]string
+	GroupConfigured    bool
+	GroupCode          string
+	MatrixEnabled      bool
+	EntityCountEnabled bool
+	Scopes             []UniverseScope
+	Summaries          map[string]UniverseSummary
+	AcquisitionDate    time.Time
+	Acquisition        []UniverseAcquisition
+	DistributionDate   time.Time
+	Buckets            []UniverseBucket
+	MatrixDate         time.Time
+	Cells              []UniverseCell
+	MatrixTotals       map[string]*int64
 }
 
 type UniverseViewMetric struct {
@@ -81,6 +82,7 @@ type UniverseViewMatrix struct {
 	Rows    []UniverseViewMatrixRow
 }
 type UniverseViewGroup struct {
+	MatrixEnabled, EntityCountEnabled                   bool
 	TotalMembers, LatestMemberGrowth                    *UniverseViewMetric
 	MemberActivity                                      *UniverseViewActivity
 	MemberPenetrationRetail, NonMemberTransactionRetail *UniverseViewMetric

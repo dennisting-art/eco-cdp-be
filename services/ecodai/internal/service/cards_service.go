@@ -95,13 +95,14 @@ func buildCardsContext(ctx context.Context, scopeCode string, firstMonth, lastMo
 		if feature.Code == "" {
 			return invalidConfig("empty_feature_code")
 		}
-		if seen[feature.Code] {
+		key := strings.ToLower(feature.Code)
+		if seen[key] {
 			return invalidConfig("duplicate_feature_code")
 		}
 		if feature.Type != "TREND" && feature.Type != "COMBO_TREND" && feature.Type != "DISTRIBUTION" {
 			return invalidConfig("unknown_feature_type")
 		}
-		seen[feature.Code] = true
+		seen[key] = true
 	}
 
 	enabled, successful, hasInvalid := 0, 0, false

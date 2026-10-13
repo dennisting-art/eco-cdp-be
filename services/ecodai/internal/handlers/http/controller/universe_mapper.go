@@ -29,6 +29,22 @@ func mapUniverseMetricSlice(v []domain.UniverseViewMetric) []dto.UniverseMetric 
 	return out
 }
 
+func universeChart[T any](data *T, enabled bool) dto.UniverseChart[T] {
+	return dto.UniverseChart[T]{IsEnabled: enabled, Data: data}
+}
+
+func mapUniverseMetricChart(v *domain.UniverseViewMetric) dto.UniverseChart[dto.UniverseMetric] {
+	return universeChart(mapOptionalUniverseMetric(v), true)
+}
+
+func mapUniverseMetricListChart(v []domain.UniverseViewMetric) dto.UniverseChart[[]dto.UniverseMetric] {
+	if v == nil {
+		return universeChart[[]dto.UniverseMetric](nil, true)
+	}
+	items := mapUniverseMetricSlice(v)
+	return universeChart(&items, true)
+}
+
 func mapUniverseView(v domain.UniverseView) dto.UniverseResponse {
 	out := dto.UniverseResponse{
 		Status: v.Status, Warnings: []dto.UniverseWarning{},
@@ -60,26 +76,34 @@ func mapUniverseView(v domain.UniverseView) dto.UniverseResponse {
 		out.Scopes = append(out.Scopes, dto.UniverseScope{ScopeCode: scope.Code, DisplayName: scope.Name})
 	}
 	for _, card := range v.Opcos {
-		out.Opcos = append(out.Opcos, dto.UniverseOpco{
-			ScopeCode: card.ScopeCode, IsEnabled: card.IsEnabled, TotalRetailCount: card.TotalRetailCount,
-			Member: mapOptionalUniverseMetric(card.Member), NonMember: mapOptionalUniverseMetric(card.NonMember),
-		})
+		item := dto.UniverseOpco{ScopeCode: card.ScopeCode, IsEnabled: card.IsEnabled}
+		if card.IsEnabled && card.Member != nil && card.NonMember != nil {
+			item.Data = &dto.UniverseOpcoData{
+				TotalRetailCount: card.TotalRetailCount,
+				Member:           mapOptionalUniverseMetric(card.Member), NonMember: mapOptionalUniverseMetric(card.NonMember),
+			}
+		}
+		out.Opcos = append(out.Opcos, item)
 	}
 	group := v.Group
-	out.Group.TotalMembers = mapOptionalUniverseMetric(group.TotalMembers)
-	out.Group.LatestMemberGrowth = mapOptionalUniverseMetric(group.LatestMemberGrowth)
+	out.Group.TotalMembers = mapUniverseMetricChart(group.TotalMembers)
+	out.Group.LatestMemberGrowth = mapUniverseMetricChart(group.LatestMemberGrowth)
 	if group.MemberActivity != nil {
-		out.Group.MemberActivity = &dto.UniverseActivity{
+		activity := dto.UniverseActivity{
 			Active:   mapUniverseMetric(group.MemberActivity.Active),
 			Inactive: mapUniverseMetric(group.MemberActivity.Inactive),
 		}
+		out.Group.MemberActivity = universeChart(&activity, true)
+	} else {
+		out.Group.MemberActivity = universeChart[dto.UniverseActivity](nil, true)
 	}
-	out.Group.MemberPenetrationRetail = mapOptionalUniverseMetric(group.MemberPenetrationRetail)
-	out.Group.NonMemberTransactionRetail = mapOptionalUniverseMetric(group.NonMemberTransactionRetail)
-	out.Group.AnnualMemberAcquisition = mapUniverseMetricSlice(group.AnnualMemberAcquisition)
-	out.Group.EntityMemberCount = mapUniverseMetricSlice(group.EntityMemberCount)
+	out.Group.MemberPenetrationRetail = mapUniverseMetricChart(group.MemberPenetrationRetail)
+	out.Group.NonMemberTransactionRetail = mapUniverseMetricChart(group.NonMemberTransactionRetail)
+	out.Group.AnnualMemberAcquisition = mapUniverseMetricListChart(group.AnnualMemberAcquisition)
+	out.Group.EntityMemberCount = mapUniverseMetricListChart(group.EntityMemberCount)
+	out.Group.EntityMemberCount.IsEnabled = group.EntityCountEnabled
 	if group.MemberMatrixActivity != nil {
-		out.Group.MemberMatrixActivity = &dto.UniverseMatrix{
+		matrix := dto.UniverseMatrix{
 			Columns: append([]string{}, group.MemberMatrixActivity.Columns...),
 			Rows:    make([]dto.UniverseMatrixRow, 0, len(group.MemberMatrixActivity.Rows)),
 		}
@@ -91,8 +115,11 @@ func mapUniverseView(v domain.UniverseView) dto.UniverseResponse {
 			for _, relationship := range row.Relationships {
 				mapped.Relationships = append(mapped.Relationships, mapUniverseMetric(relationship))
 			}
-			out.Group.MemberMatrixActivity.Rows = append(out.Group.MemberMatrixActivity.Rows, mapped)
+			matrix.Rows = append(matrix.Rows, mapped)
 		}
+		out.Group.MemberMatrixActivity = universeChart(&matrix, group.MatrixEnabled)
+	} else {
+		out.Group.MemberMatrixActivity = universeChart[dto.UniverseMatrix](nil, group.MatrixEnabled)
 	}
 	return out
 }

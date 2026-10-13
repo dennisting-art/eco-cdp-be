@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getUniverseEntityCountFeatureEnabled = `-- name: GetUniverseEntityCountFeatureEnabled :one
+SELECT EXISTS (
+    SELECT 1 FROM ecosystem_scope_feature AS esf
+    JOIN feature_summary AS f ON f.feature_code = esf.feature_code
+    WHERE esf.scope_code = $1
+      AND esf.feature_code = 'ENT_CNT'
+      AND esf.is_enabled = TRUE
+      AND f.feature_context = 'UNIVERSE'
+      AND f.feature_type = 'DISTRIBUTION'
+) AS is_enabled
+`
+
+func (q *Queries) GetUniverseEntityCountFeatureEnabled(ctx context.Context, scopeCode string) (bool, error) {
+	row := q.db.QueryRow(ctx, getUniverseEntityCountFeatureEnabled, scopeCode)
+	var is_enabled bool
+	err := row.Scan(&is_enabled)
+	return is_enabled, err
+}
+
 const getUniverseGroupScope = `-- name: GetUniverseGroupScope :one
 
 SELECT scope_code

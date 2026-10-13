@@ -26,13 +26,25 @@ type CardsSummaryMetric struct {
 }
 
 type CardsFeature struct {
-	FeatureCode string                        `json:"feature_code"`
-	DisplayName string                        `json:"display_name"`
-	Type        string                        `json:"type"`
-	IsEnabled   bool                          `json:"is_enabled"`
-	Trend       any                           `json:"trend,omitempty"`
-	Buckets     *[]CardsMetricPoint           `json:"buckets,omitempty"`
-	Summary     map[string]CardsSummaryMetric `json:"summary,omitempty"`
+	FeatureCode  string `json:"feature_code"`
+	DisplayName  string `json:"display_name"`
+	Type         string `json:"type"`
+	DisplayOrder int    `json:"display_order"`
+	IsEnabled    bool   `json:"is_enabled"`
+	Data         any    `json:"data"`
+}
+
+type CardsTrendData struct {
+	Points []CardsActivityPoint `json:"points"`
+}
+
+type CardsComboTrendData struct {
+	Points []CardsMetricPoint `json:"points"`
+}
+
+type CardsDistributionData struct {
+	Buckets []CardsMetricPoint            `json:"buckets"`
+	Summary map[string]CardsSummaryMetric `json:"summary,omitempty"`
 }
 
 type CardsWarning struct {
@@ -42,8 +54,8 @@ type CardsWarning struct {
 }
 
 type CardsResponse struct {
-	Status    string         `json:"status"`
-	Warnings  []CardsWarning `json:"warnings"`
-	ScopeCode string         `json:"scope_code"`
-	Features  []CardsFeature `json:"features"`
+	Status    string                  `json:"status"`
+	Warnings  []CardsWarning          `json:"warnings"`
+	ScopeCode string                  `json:"scope_code"`
+	Features  map[string]CardsFeature `json:"features"`
 }

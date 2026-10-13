@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/ecodai/internal/domain"
@@ -81,7 +82,7 @@ func mapCardsView(view domain.CardsView) dto.CardsResponse {
 	out := dto.CardsResponse{
 		Status: view.Status, ScopeCode: view.ScopeCode,
 		Warnings: make([]dto.CardsWarning, 0, len(view.Warnings)),
-		Features: make([]dto.CardsFeature, 0, len(view.Features)),
+		Features: make(map[string]dto.CardsFeature, len(view.Features)),
 	}
 	for _, warning := range view.Warnings {
 		out.Warnings = append(out.Warnings, dto.CardsWarning{
@@ -90,38 +91,42 @@ func mapCardsView(view domain.CardsView) dto.CardsResponse {
 			Message:     warning.Message,
 		})
 	}
-	for _, feature := range view.Features {
-		item := dto.CardsFeature{FeatureCode: feature.Code, DisplayName: feature.Name, Type: feature.Type, IsEnabled: feature.Enabled}
+	for index, feature := range view.Features {
+		item := dto.CardsFeature{FeatureCode: feature.Code, DisplayName: feature.Name, Type: feature.Type, DisplayOrder: index + 1, IsEnabled: feature.Enabled}
+		if !feature.Enabled {
+			out.Features[strings.ToLower(feature.Code)] = item
+			continue
+		}
 		switch feature.Type {
 		case "TREND":
 			trend := make([]dto.CardsActivityPoint, 0, len(feature.Activity))
 			for _, point := range feature.Activity {
 				trend = append(trend, dto.CardsActivityPoint{Date: point.Date, Active: point.Active, ActivePre: point.ActivePre, Inactive: point.Inactive})
 			}
-			item.Trend = trend
+			item.Data = dto.CardsTrendData{Points: trend}
 		case "COMBO_TREND":
 			trend := make([]dto.CardsMetricPoint, 0, len(feature.Trend))
 			for _, point := range feature.Trend {
 				trend = append(trend, dto.CardsMetricPoint{Label: point.Label, Count: point.Count, Percent: point.Percent})
 			}
-			item.Trend = trend
+			item.Data = dto.CardsComboTrendData{Points: trend}
 		case "DISTRIBUTION":
-			buckets := make([]dto.CardsMetricPoint, 0, len(feature.Buckets))
+			data := dto.CardsDistributionData{Buckets: make([]dto.CardsMetricPoint, 0, len(feature.Buckets))}
 			for _, point := range feature.Buckets {
-				buckets = append(buckets, dto.CardsMetricPoint{Label: point.Label, Count: point.Count, Percent: point.Percent})
+				data.Buckets = append(data.Buckets, dto.CardsMetricPoint{Label: point.Label, Count: point.Count, Percent: point.Percent})
 			}
-			item.Buckets = &buckets
-		}
-		if len(feature.Summary) > 0 {
-			item.Summary = make(map[string]dto.CardsSummaryMetric, len(feature.Summary))
-			for code, metric := range feature.Summary {
-				item.Summary[code] = dto.CardsSummaryMetric{
-					Label: metric.Label, Count: metric.Count, Percent: metric.Percent,
-					Growth: metric.Growth, Compare: metric.Compare,
+			if len(feature.Summary) > 0 {
+				data.Summary = make(map[string]dto.CardsSummaryMetric, len(feature.Summary))
+				for code, metric := range feature.Summary {
+					data.Summary[code] = dto.CardsSummaryMetric{
+						Label: metric.Label, Count: metric.Count, Percent: metric.Percent,
+						Growth: metric.Growth, Compare: metric.Compare,
+					}
 				}
 			}
+			item.Data = data
 		}
-		out.Features = append(out.Features, item)
+		out.Features[strings.ToLower(feature.Code)] = item
 	}
 	return out
 }

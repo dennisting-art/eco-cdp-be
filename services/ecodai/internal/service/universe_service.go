@@ -109,6 +109,8 @@ func buildUniverseContext(ctx context.Context, s domain.UniverseSnapshot) (domai
 		}
 	}
 	group := s.Summaries[s.GroupCode]
+	out.Group.MatrixEnabled = s.MatrixEnabled
+	out.Group.EntityCountEnabled = s.EntityCountEnabled
 	totalIssue := universeCounts(group.Date, group.TotalMembers)
 	if totalIssue == nil {
 		out.Group.TotalMembers = &domain.UniverseViewMetric{Count: group.TotalMembers}
@@ -145,11 +147,15 @@ func buildUniverseContext(ctx context.Context, s domain.UniverseSnapshot) (domai
 	}
 	record("annual_member_acquisition", "", s.AcquisitionDate, acquisitionIssue)
 	record("latest_member_growth", "", s.AcquisitionDate, acquisitionIssue)
-	buckets, bucketIssue := buildUniverseBuckets(s)
-	if bucketIssue == nil {
-		out.Group.EntityMemberCount = buckets
+	if s.EntityCountEnabled {
+		buckets, bucketIssue := buildUniverseBuckets(s)
+		if bucketIssue == nil {
+			out.Group.EntityMemberCount = buckets
+		}
+		record("entity_member_count", "", s.DistributionDate, bucketIssue)
+	} else {
+		out.AsOfDates.Group["entity_member_count"] = nil
 	}
-	record("entity_member_count", "", s.DistributionDate, bucketIssue)
 	for _, scope := range s.Scopes {
 		card := domain.UniverseViewOpco{ScopeCode: scope.Code, IsEnabled: scope.Enabled}
 		if !scope.Enabled {

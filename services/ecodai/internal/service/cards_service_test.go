@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -182,6 +183,9 @@ func TestCardsRejectsEndpointFeatureConfiguration(t *testing.T) {
 		"empty code": func(s *domain.CardsSnapshot) { s.Features[0].Code = "" },
 		"duplicate code": func(s *domain.CardsSnapshot) {
 			s.Features[1].Code = s.Features[0].Code
+		},
+		"case-insensitive duplicate code": func(s *domain.CardsSnapshot) {
+			s.Features[1].Code = strings.ToLower(s.Features[0].Code)
 		},
 		"unknown type": func(s *domain.CardsSnapshot) { s.Features[0].Type = "UNKNOWN" },
 	} {

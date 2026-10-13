@@ -22,6 +22,17 @@ SELECT EXISTS (
       AND f.feature_type = 'MATRIX'
 ) AS is_enabled;
 
+-- name: GetUniverseEntityCountFeatureEnabled :one
+SELECT EXISTS (
+    SELECT 1 FROM ecosystem_scope_feature AS esf
+    JOIN feature_summary AS f ON f.feature_code = esf.feature_code
+    WHERE esf.scope_code = $1
+      AND esf.feature_code = 'ENT_CNT'
+      AND esf.is_enabled = TRUE
+      AND f.feature_context = 'UNIVERSE'
+      AND f.feature_type = 'DISTRIBUTION'
+) AS is_enabled;
+
 -- name: ListUniverseLatestSummaries :many
 SELECT s.scope_code, s.as_of_date, s.total_member_count, s.active_member_count,
        s.inactive_member_count, s.total_retail_count, s.retail_member_count,
