@@ -26,9 +26,10 @@ paths:
         Valid enabled features remain available when another independent
         feature is unavailable or invalid. Such responses use status
         `partial`, omit the failed feature, and include a warning identifying
-        it. Features are keyed by lowercase feature code. Disabled features
-        remain present with `is_enabled: false` and `data: null`. The
-        `display_order` field preserves the configured feature order. Database and request-level
+        it. Features are keyed by lowercase feature code. Trend and ordinary
+        distribution data are arrays; MVC data contains `buckets` and `summary`.
+        Disabled features remain present with `is_enabled: false` and
+        `data: null`. Database and request-level
         failures still reject the whole request.
       requestBody:
         required: true
@@ -181,39 +182,31 @@ components:
         compare: {type: integer, format: int64, description: Optional comparison count when a comparison period is defined}
     CardsFeature:
       type: object
-      required: [feature_code, display_name, type, display_order, is_enabled, data]
+      required: [is_enabled, data]
+      additionalProperties: false
       properties:
-        feature_code: {type: string}
-        display_name: {type: string}
-        type: {type: string, enum: [TREND, DISTRIBUTION, COMBO_TREND]}
-        display_order: {type: integer, description: One-based position in the configured response order}
         is_enabled: {type: boolean}
         data:
-          type: object
           nullable: true
-          description: Null when disabled; otherwise the shape matching the feature type.
+          description: Null when disabled; otherwise an array for trends and ordinary distributions, or an MVC object.
           anyOf:
-            - {$ref: '#/components/schemas/CardsTrendData'}
-            - {$ref: '#/components/schemas/CardsComboTrendData'}
-            - {$ref: '#/components/schemas/CardsDistributionData'}
-    CardsTrendData:
+            - {$ref: '#/components/schemas/CardsActivitySeries'}
+            - {$ref: '#/components/schemas/CardsMetricSeries'}
+            - {$ref: '#/components/schemas/CardsMVCData'}
+    CardsActivitySeries:
+      type: array
+      items: {$ref: '#/components/schemas/CardsActivityPoint'}
+    CardsMetricSeries:
+      type: array
+      items: {$ref: '#/components/schemas/CardsMetricPoint'}
+    CardsMVCData:
       type: object
-      required: [points]
-      properties:
-        points: {type: array, items: {$ref: '#/components/schemas/CardsActivityPoint'}}
-    CardsComboTrendData:
-      type: object
-      required: [points]
-      properties:
-        points: {type: array, items: {$ref: '#/components/schemas/CardsMetricPoint'}}
-    CardsDistributionData:
-      type: object
-      required: [buckets]
+      required: [buckets, summary]
       properties:
         buckets: {type: array, items: {$ref: '#/components/schemas/CardsMetricPoint'}}
         summary:
           type: object
-          description: Present for enabled MVC; keyed by total_members, active_members, and at_risk_customers. Other features omit it.
+          description: Keyed by total_members, active_members, and at_risk_customers.
           additionalProperties: {$ref: '#/components/schemas/CardsSummaryMetric'}
     CardsWarning:
       type: object

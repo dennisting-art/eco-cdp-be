@@ -12,10 +12,11 @@ func TestCardsResponseUsesFeatureDataWrappers(t *testing.T) {
 	count := int64(42)
 	view := domain.CardsView{
 		Status: "partial", ScopeCode: "AEON",
-		Warnings: []domain.CardsWarning{{FeatureCode: "TIER", Code: "FEATURE_DATA_UNAVAILABLE", Message: "Feature data is temporarily unavailable."}},
+		Warnings: []domain.CardsWarning{{FeatureCode: "AGE", Code: "FEATURE_DATA_UNAVAILABLE", Message: "Feature data is temporarily unavailable."}},
 		Features: []domain.CardsViewFeature{
 			{Code: "ACTIVE_OPCO", Name: "Active vs Inactive", Type: "TREND", Enabled: true, Activity: []domain.CardsActivityPoint{{Date: "2026-10-01", Active: &count}}},
 			{Code: "PENETRATION_OPCO", Name: "Member Penetration", Type: "COMBO_TREND", Enabled: true, Trend: []domain.CardsMetricPoint{{Label: "2026-10-01", Count: &count}}},
+			{Code: "TIER", Name: "Member Tier Distribution", Type: "DISTRIBUTION", Enabled: true, Buckets: []domain.CardsMetricPoint{{Label: "1-Star", Count: &count}}},
 			{Code: "MVC", Name: "Member Value Centre", Type: "DISTRIBUTION", Enabled: true, Buckets: []domain.CardsMetricPoint{{Label: "New", Count: &count}}, Summary: map[string]domain.CardsSummaryMetric{"total_members": {Label: "Total Members", Count: 42}}},
 			{Code: "SEX", Name: "Gender Distribution", Type: "DISTRIBUTION", Enabled: false},
 		},
@@ -26,9 +27,12 @@ func TestCardsResponseUsesFeatureDataWrappers(t *testing.T) {
 	}
 	var body struct {
 		Features map[string]struct {
-			DisplayOrder int             `json:"display_order"`
 			IsEnabled    bool            `json:"is_enabled"`
 			Data         json.RawMessage `json:"data"`
+			FeatureCode  json.RawMessage `json:"feature_code"`
+			DisplayName  json.RawMessage `json:"display_name"`
+			Type         json.RawMessage `json:"type"`
+			DisplayOrder json.RawMessage `json:"display_order"`
 			Trend        json.RawMessage `json:"trend"`
 		} `json:"features"`
 	}
@@ -36,22 +40,26 @@ func TestCardsResponseUsesFeatureDataWrappers(t *testing.T) {
 		t.Fatal(err)
 	}
 	active := body.Features["active_opco"]
-	if !active.IsEnabled || active.DisplayOrder != 1 || len(active.Trend) != 0 || string(active.Data) != `{"points":[{"date":"2026-10-01","active":42,"active_pre":null,"inactive":null}]}` {
+	if !active.IsEnabled || len(active.Trend) != 0 || len(active.FeatureCode) != 0 || len(active.DisplayName) != 0 || len(active.Type) != 0 || len(active.DisplayOrder) != 0 || string(active.Data) != `[{"date":"2026-10-01","active":42,"active_pre":null,"inactive":null}]` {
 		t.Fatalf("active feature shape: %s", encoded)
 	}
 	penetration := body.Features["penetration_opco"]
-	if !penetration.IsEnabled || string(penetration.Data) != `{"points":[{"label":"2026-10-01","count":42,"percent":null}]}` {
+	if !penetration.IsEnabled || string(penetration.Data) != `[{"label":"2026-10-01","count":42,"percent":null}]` {
 		t.Fatalf("combo trend shape: %s", encoded)
 	}
-	mvc := body.Features["mvc"]
-	if !mvc.IsEnabled || mvc.DisplayOrder != 3 || string(mvc.Data) != `{"buckets":[{"label":"New","count":42,"percent":null}],"summary":{"total_members":{"label":"Total Members","count":42,"percent":null}}}` {
+	tier := body.Features["tier"]
+	if !tier.IsEnabled || string(tier.Data) != `[{"label":"1-Star","count":42,"percent":null}]` {
 		t.Fatalf("distribution shape: %s", encoded)
 	}
+	mvc := body.Features["mvc"]
+	if !mvc.IsEnabled || string(mvc.Data) != `{"buckets":[{"label":"New","count":42,"percent":null}],"summary":{"total_members":{"label":"Total Members","count":42,"percent":null}}}` {
+		t.Fatalf("MVC shape: %s", encoded)
+	}
 	disabled := body.Features["sex"]
-	if disabled.IsEnabled || disabled.DisplayOrder != 4 || string(disabled.Data) != "null" {
+	if disabled.IsEnabled || string(disabled.Data) != "null" {
 		t.Fatalf("disabled feature shape: %s", encoded)
 	}
-	if _, found := body.Features["tier"]; found {
+	if _, found := body.Features["age"]; found {
 		t.Fatalf("failed feature should be reported only in warnings: %s", encoded)
 	}
 }

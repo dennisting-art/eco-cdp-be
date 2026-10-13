@@ -26,25 +26,13 @@ type CardsSummaryMetric struct {
 }
 
 type CardsFeature struct {
-	FeatureCode  string `json:"feature_code"`
-	DisplayName  string `json:"display_name"`
-	Type         string `json:"type"`
-	DisplayOrder int    `json:"display_order"`
-	IsEnabled    bool   `json:"is_enabled"`
-	Data         any    `json:"data"`
+	IsEnabled bool `json:"is_enabled"`
+	Data      any  `json:"data"`
 }
 
-type CardsTrendData struct {
-	Points []CardsActivityPoint `json:"points"`
-}
-
-type CardsComboTrendData struct {
-	Points []CardsMetricPoint `json:"points"`
-}
-
-type CardsDistributionData struct {
+type CardsMVCData struct {
 	Buckets []CardsMetricPoint            `json:"buckets"`
-	Summary map[string]CardsSummaryMetric `json:"summary,omitempty"`
+	Summary map[string]CardsSummaryMetric `json:"summary"`
 }
 
 type CardsWarning struct {

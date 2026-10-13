@@ -91,8 +91,8 @@ func mapCardsView(view domain.CardsView) dto.CardsResponse {
 			Message:     warning.Message,
 		})
 	}
-	for index, feature := range view.Features {
-		item := dto.CardsFeature{FeatureCode: feature.Code, DisplayName: feature.Name, Type: feature.Type, DisplayOrder: index + 1, IsEnabled: feature.Enabled}
+	for _, feature := range view.Features {
+		item := dto.CardsFeature{IsEnabled: feature.Enabled}
 		if !feature.Enabled {
 			out.Features[strings.ToLower(feature.Code)] = item
 			continue
@@ -103,28 +103,30 @@ func mapCardsView(view domain.CardsView) dto.CardsResponse {
 			for _, point := range feature.Activity {
 				trend = append(trend, dto.CardsActivityPoint{Date: point.Date, Active: point.Active, ActivePre: point.ActivePre, Inactive: point.Inactive})
 			}
-			item.Data = dto.CardsTrendData{Points: trend}
+			item.Data = trend
 		case "COMBO_TREND":
 			trend := make([]dto.CardsMetricPoint, 0, len(feature.Trend))
 			for _, point := range feature.Trend {
 				trend = append(trend, dto.CardsMetricPoint{Label: point.Label, Count: point.Count, Percent: point.Percent})
 			}
-			item.Data = dto.CardsComboTrendData{Points: trend}
+			item.Data = trend
 		case "DISTRIBUTION":
-			data := dto.CardsDistributionData{Buckets: make([]dto.CardsMetricPoint, 0, len(feature.Buckets))}
+			buckets := make([]dto.CardsMetricPoint, 0, len(feature.Buckets))
 			for _, point := range feature.Buckets {
-				data.Buckets = append(data.Buckets, dto.CardsMetricPoint{Label: point.Label, Count: point.Count, Percent: point.Percent})
+				buckets = append(buckets, dto.CardsMetricPoint{Label: point.Label, Count: point.Count, Percent: point.Percent})
 			}
-			if len(feature.Summary) > 0 {
-				data.Summary = make(map[string]dto.CardsSummaryMetric, len(feature.Summary))
+			if feature.Code == "MVC" {
+				data := dto.CardsMVCData{Buckets: buckets, Summary: make(map[string]dto.CardsSummaryMetric, len(feature.Summary))}
 				for code, metric := range feature.Summary {
 					data.Summary[code] = dto.CardsSummaryMetric{
 						Label: metric.Label, Count: metric.Count, Percent: metric.Percent,
 						Growth: metric.Growth, Compare: metric.Compare,
 					}
 				}
+				item.Data = data
+			} else {
+				item.Data = buckets
 			}
-			item.Data = data
 		}
 		out.Features[strings.ToLower(feature.Code)] = item
 	}
