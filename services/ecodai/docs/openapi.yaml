@@ -1,0 +1,590 @@
+openapi: 3.0.3
+info:
+  title: CDP v0 API
+  version: 0.1.0
+  description: eco-cdp-be Customer Intelligence v0 APIs and internal utilities.
+servers:
+  - url: ./
+    description: Current host, including its gateway prefix when served through the gateway
+security:
+  - bearerAuth: []
+paths:
+  /api/v0/segments/list:
+    get:
+      tags: [Segments v0]
+      summary: List visible segments by tag
+      description: Requires `cdphub.cust_intel.view`. Every visible segment has exactly one category tag (`predefine`, `custom`, or `attribute`); `tags=attribute` lists the 27 local attribute entries when seeded. The internal all-members base is hidden.
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+        - {name: pageSize, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: search, in: query, schema: {type: string}}
+        - {name: tags, in: query, schema: {type: array, items: {type: string}}, style: form, explode: true}
+      responses:
+        '200':
+          description: Envelope with segments, page, pageSize, and total
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/SegmentListData'}
+        '400': {description: Invalid pagination}
+        '401': {$ref: '#/components/responses/UnauthorizedError'}
+        '403': {description: Permission denied}
+  /api/v0/segments/{id}:
+    get:
+      tags: [Segments v0]
+      summary: Read one segment definition
+      description: Requires `cdphub.cust_intel.view`.
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, example: seg_100001}}
+      responses:
+        '200':
+          description: Envelope with segment definition and available filters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: {$ref: '#/components/schemas/SegmentDefinition'}
+        '401': {$ref: '#/components/responses/UnauthorizedError'}
+        '403': {description: Permission denied}
+        '404': {description: Segment not found}
+  /api/v0/segments:
+    post:
+      tags: [Segments v0]
+      summary: Create a custom segment definition
+      description: Requires `cdphub.cust_intel.view`; the authenticated subject is stored as creator. The service adds the `custom` category tag; callers cannot supply any of the three reserved category tags.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SegmentCreate'}
+      responses:
+        '201': {description: Envelope with the new seg_... definition}
+        '400': {description: Invalid definition, error code 10001}
+        '401': {$ref: '#/components/responses/UnauthorizedError'}
+        '403': {description: Permission denied}
+  /api/v0/segments/requests:
+    post:
+      tags: [Segments v0]
+      summary: Estimate members or queue one CSV export
+      description: Requires `cdphub.cust_intel.view`. Confirm is available only while the export worker is enabled. Idempotency-Key is scoped to the caller.
+      parameters:
+        - {name: Idempotency-Key, in: header, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SegmentRequestInput'}
+      responses:
+        '200': {description: Envelope with count for estimate or request_id and INIT status for confirm}
+        '400': {description: Invalid selection, error code 10001}
+        '401': {$ref: '#/components/responses/UnauthorizedError'}
+        '403': {description: Permission denied}
+        '503': {description: Export unavailable}
+  /api/v0/segments/requests/{request_id}:
+    get:
+      tags: [Segments v0]
+      summary: Poll export progress with the request ID
+      description: Requires a bearer token with `cdphub.cust_intel.view`. Build-backed requests are local-only until the organisation guard is enabled.
+      parameters:
+        - {name: request_id, in: path, required: true, schema: {type: string, example: segreq_550e8400-e29b-41d4-a716-446655440000}}
+      responses:
+        '200':
+          description: Envelope with status and durable progress; READY adds counts and bucket URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data: {$ref: '#/components/schemas/SegmentRequestStatus'}
+        '404': {description: Unknown request ID}
+        '401': {$ref: '#/components/responses/UnauthorizedError'}
+        '403': {description: Permission denied}
+  /api/v0/customer-intelligence/cards:
+    post:
+      summary: Read Customer Intelligence charts for one scope
+      operationId: queryCustomerIntelligenceCards
+      tags: [Customer Intelligence]
+      description: |
+        Requires `cdphub.cust_intel.view` or the literal `cdphub.*` grant. Omitted,
+        null, or empty `scope_code` selects AEON; an explicit scope such as ABG
+        selects that scope.
+        With no dates, the newest source date across enabled Cards features sets
+        the end date; the default range covers that month and five prior months.
+        An explicit start_date/end_date selects an inclusive range. Monthly
+        trends contain only complete available points in that range. Missing
+        source dates produce chart-level data_status partial; no source data
+        produces data_status missing and an empty array. Published zero counts
+        remain zero.
+        `active_pre` reads the same month one
+        year earlier. Penetration percent is a ratio from 0 to 1.
+        A snapshot chart is returned only on the expected end date. Older
+        snapshots within the selected range are stale; absent snapshots are
+        missing. Each affected feature remains present with is_enabled true,
+        data null, and its own data_status. The top-level status is partial
+        when any feature has an issue. Invalid data also receives a warning;
+        stale and missing data are reported on the feature itself.
+        Features are keyed by lowercase feature code. Trend and ordinary
+        distribution data are arrays; MVC data contains `buckets` and `summary`.
+        Disabled features remain present with `is_enabled: false` and
+        `data: null`, without data_status. Database and request-level
+        failures still reject the whole request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardsRequest'
+            examples:
+              aeon: {value: {scope_code: ''}}
+              opco: {value: {scope_code: ABG}}
+              historical: {value: {scope_code: AEON, start_date: '2026-09-01', end_date: '2026-09-30'}}
+      responses:
+        '200':
+          description: Complete or partially available configured features and their reporting data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  trace_id: {type: string}
+                  message: {type: string}
+                  data: {$ref: '#/components/schemas/CardsResponse'}
+        '400': {description: Invalid request body or scope code}
+        '401': {$ref: '#/components/responses/UnauthorizedError'}
+        '403': {description: Customer Intelligence permission denied}
+        '404': {description: Scope missing or unavailable}
+        '500': {description: All enabled features invalid, invalid endpoint configuration, or database error}
+        '503': {description: Authentication provider unavailable (error code `503`) or Cards data unavailable (feature code `93003`)}
+  /api/v0/customer-intelligence/universe:
+    post:
+      summary: Read the latest Customer Intelligence Universe charts
+      operationId: queryCustomerIntelligenceUniverse
+      tags: [Customer Intelligence]
+      description: |
+        Requires `cdphub.cust_intel.view` or the literal `cdphub.*` grant.
+        With no dates, the newest source date across enabled Universe charts and
+        Op-Co cards sets the end date; the default range starts on 2018-01-01.
+        An explicit start_date/end_date selects an inclusive range. Each
+        snapshot chart and enabled Op-Co card must have data on the expected
+        end date. Older snapshots within the range are stale; absent snapshots
+        are missing. Each affected chart has its own data_status. Annual member
+        acquisition retains available yearly points and is partial when years
+        or the expected source date are missing. `as_of_date` is the newest
+        included chart date, while `as_of_dates` gives each included date.
+        Ratios are fractions from 0 to 1; growth may be negative or above 1.
+        The group-scoped MEMBER_MATRIX_ACTIVITY feature controls matrix visibility.
+        When enabled, matrix rows and columns include Op-Cos present in the latest
+        matrix snapshot, even when their detail view is unavailable. Every directed
+        relationship and primary total is required. When the feature is disabled,
+        the matrix is null without a data warning. Disabled Op-Co cards have null
+        data and date.
+        Valid charts remain available when another independent chart is stale,
+        missing, or invalid. Such responses use status `partial` and include
+        a warning for invalid data. Stale and missing data are reported on the
+        affected chart. Each chart has `is_enabled` and `data`; unconfigured group
+        charts are enabled by default, while the entity count distribution,
+        matrix, and Op-Co cards use
+        their configured enablement. Disabled and unavailable snapshot data is null;
+        warnings identify invalid data. Disabled charts have no data_status.
+        A default request with no source date returns 503.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UniverseRequest'
+            examples:
+              latest: {value: {start_date: '', end_date: ''}}
+              historical: {value: {start_date: '2026-09-01', end_date: '2026-09-30'}}
+      responses:
+        '200':
+          description: Latest complete or partially available Universe charts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  trace_id: {type: string}
+                  message: {type: string}
+                  data: {$ref: '#/components/schemas/UniverseResponse'}
+        '400': {description: Invalid JSON or reporting date range}
+        '401': {$ref: '#/components/responses/UnauthorizedError'}
+        '403': {description: Universe permission denied}
+        '500': {description: Invalid reporting configuration or database error}
+        '503': {description: Authentication provider unavailable (error code `503`) or Universe data unavailable (feature code `93001`)}
+  /api/v0/internal/access:
+    get:
+      operationId: checkAccess
+      tags: [Internal Authentication]
+      summary: Validate a caller token
+      responses:
+        '200': {description: Valid token}
+        '401': {$ref: '#/components/responses/UnauthorizedError'}
+        '503':
+          description: Token validation service unavailable; error code `503` and message `service unavailable`
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+              example:
+                success: false
+                errors: {code: '503', message: service unavailable}
+  /api/v0/internal/self-pilot/token:
+    post:
+      operationId: issueSelfPilotToken
+      tags: [Internal Authentication]
+      summary: Issue an internal test token
+      description: Available only in Local, Dev, and UAT when enabled. Dev and UAT ingress must restrict this endpoint to the internal network. No caller authentication is required. Send an empty body or `{}`. eco-cdp-be issues the fixed cdphub_tester profile with its configured token TTL. The profile grants the literal cdphub.* permission, which matches CDP Hub permissions only. Restart revokes issued tokens.
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              maxProperties: 0
+            example: {}
+      responses:
+        '200':
+          description: Token issued; Cache-Control no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  trace_id: {type: string}
+                  data:
+                    type: object
+                    properties:
+                      access_token: {type: string}
+                      token_type: {type: string, enum: [Bearer]}
+                      expires_in: {type: integer}
+                      profile: {type: string}
+        '400': {description: Invalid request}
+        '429': {description: Rate limit exceeded}
+        '503': {description: Token issuance unavailable}
+components:
+  schemas:
+    SegmentDefinition:
+      type: object
+      required: [id, name, tags, kind, definition_version, definition_status, estimated_count, count_source, filters]
+      properties:
+        id: {type: string, example: seg_100004}
+        name: {type: string}
+        tags: {type: array, items: {type: string}, description: Exactly one of predefine, custom, or attribute, plus optional descriptive tags}
+        category: {type: string, description: Display group for attribute entries, such as Age Band}
+        category_code: {type: string, description: Stable category identity for an approved option}
+        kind: {type: string, enum: [base, option, predefined, custom]}
+        definition_version: {type: integer, minimum: 1}
+        definition_status: {type: string, enum: [draft, approved, retired]}
+        description: {type: string, nullable: true}
+        estimated_count: {type: integer, format: int64, nullable: true, description: Null when no sourced patched or computed count is available}
+        count_source: {type: string, enum: [patched, computed], nullable: true}
+        count_basis: {type: string, description: Population and consent basis of a displayed count}
+        count_as_of: {type: string, format: date}
+        filters: {type: array, items: {$ref: '#/components/schemas/SegmentFilter'}}
+        last_updated_at: {type: string, format: date-time, nullable: true}
+    SegmentListData:
+      type: object
+      required: [segments, page, pageSize, total]
+      properties:
+        segments: {type: array, items: {$ref: '#/components/schemas/SegmentDefinition'}}
+        page: {type: integer}
+        pageSize: {type: integer}
+        total: {type: integer, format: int64}
+    SegmentFilter:
+      type: object
+      required: [key, values]
+      properties:
+        key: {type: string}
+        operation: {type: string, description: Optional in a request selection; the stored definition supplies the operator}
+        values: {description: A selected scalar or a nonempty array for an in filter}
+    SegmentCreate:
+      type: object
+      required: [name, filters]
+      properties:
+        name: {type: string}
+        tags: {type: array, items: {type: string}, description: Optional descriptive tags only; predefine, custom, and attribute are reserved}
+        description: {type: string}
+        operation: {type: string, enum: [AND, OR], default: AND}
+        filters: {type: array, minItems: 1, items: {$ref: '#/components/schemas/SegmentFilter'}}
+    SegmentSelection:
+      type: object
+      required: [id]
+      properties:
+        id: {type: string, example: seg_100001}
+        filters: {type: array, maxItems: 20, items: {$ref: '#/components/schemas/SegmentFilter'}}
+        operation: {type: string, enum: [AND, OR], description: Combines this selection with the next; omit on the last selection}
+    SegmentRequestInput:
+      type: object
+      required: [mode, segments]
+      properties:
+        mode: {type: string, enum: [estimate, confirm]}
+        base: {type: string, description: all_members or a segment ID; defaults to all_members, example: all_members}
+        segments: {type: array, minItems: 1, maxItems: 50, items: {$ref: '#/components/schemas/SegmentSelection'}}
+    SegmentRequestStatus:
+      type: object
+      required: [request_id, status, progress]
+      properties:
+        request_id: {type: string}
+        build_id: {type: string, description: Pinned READY build for build-backed confirmations}
+        status: {type: string, enum: [INIT, PROCESSING, READY, FAILED]}
+        total_count: {type: integer, format: int64}
+        build_consent_count: {type: integer, format: int64}
+        consent_count: {type: integer, format: int64}
+        consent_checked_at: {type: string, format: date-time}
+        bucket: {type: string, description: Finalized GCS HTTPS object URL, or a local file URI in local mode}
+        error_code: {type: string}
+        progress:
+          type: object
+          required: [stage, files_completed, files_total, bytes_uploaded]
+          properties:
+            stage: {type: string, enum: [QUEUED, EVALUATING, BUILDING, UPLOADING, VERIFYING, COMPLETE, FAILED]}
+            files_completed: {type: integer}
+            files_total: {type: integer}
+            bytes_uploaded: {type: integer, format: int64}
+    CardsRequest:
+      type: object
+      additionalProperties: false
+      description: Omitted, null, or empty string scope_code selects AEON. Whitespace is invalid.
+      properties:
+        scope_code: {type: string, nullable: true, default: null, example: ABG}
+        start_date: {type: string, format: date, description: Inclusive; supply with end_date}
+        end_date: {type: string, format: date, description: Inclusive; supply with start_date}
+    CardsActivityPoint:
+      type: object
+      required: [date, active, active_pre, inactive]
+      properties:
+        date: {type: string, format: date, description: First day of the report month}
+        active: {type: integer, format: int64, nullable: true}
+        active_pre: {type: integer, format: int64, nullable: true, description: Same month in the previous year}
+        inactive: {type: integer, format: int64, nullable: true}
+    CardsMetricPoint:
+      type: object
+      required: [label, count, percent]
+      properties:
+        label: {type: string}
+        count: {type: integer, format: int64, nullable: true}
+        percent: {type: number, format: double, nullable: true, description: Ratio from 0 to 1}
+    CardsSummaryMetric:
+      type: object
+      required: [label, count, percent]
+      properties:
+        label: {type: string}
+        count: {type: integer, format: int64}
+        percent: {type: number, format: double, nullable: true, description: Ratio from 0 to 1; null when not applicable or when total members is zero}
+        growth: {type: number, format: double, description: Optional growth ratio when a comparison period is defined}
+        compare: {type: integer, format: int64, description: Optional comparison count when a comparison period is defined}
+    CardsFeature:
+      type: object
+      example: {is_enabled: true, data: null, data_status: stale}
+      required: [is_enabled, data]
+      additionalProperties: false
+      properties:
+        is_enabled: {type: boolean}
+        data_status: {type: string, enum: [stale, missing, partial], description: Present only on an enabled feature with a data issue}
+        data:
+          nullable: true
+          description: Null when disabled or a snapshot is stale or missing; otherwise an array for trends and ordinary distributions, or an MVC object.
+          anyOf:
+            - {$ref: '#/components/schemas/CardsActivitySeries'}
+            - {$ref: '#/components/schemas/CardsMetricSeries'}
+            - {$ref: '#/components/schemas/CardsMVCData'}
+    CardsActivitySeries:
+      type: array
+      items: {$ref: '#/components/schemas/CardsActivityPoint'}
+    CardsMetricSeries:
+      type: array
+      items: {$ref: '#/components/schemas/CardsMetricPoint'}
+    CardsMVCData:
+      type: object
+      required: [buckets, summary]
+      properties:
+        buckets: {type: array, items: {$ref: '#/components/schemas/CardsMetricPoint'}}
+        summary:
+          type: object
+          description: Keyed by total_members, active_members, and at_risk_customers.
+          additionalProperties: {$ref: '#/components/schemas/CardsSummaryMetric'}
+    CardsWarning:
+      type: object
+      required: [feature_code, code, message]
+      properties:
+        feature_code: {type: string, description: Stable identifier of the omitted failed feature}
+        code: {type: string, enum: [FEATURE_DATA_INVALID]}
+        message: {type: string, description: Safe user-facing warning without internal details}
+    CardsResponse:
+      type: object
+      required: [status, warnings, scope_code, start_date, end_date, features]
+      properties:
+        status: {type: string, enum: [complete, partial]}
+        start_date: {type: string, description: Resolved inclusive date; empty if all features are disabled and no dates were supplied}
+        end_date: {type: string, description: Resolved inclusive date; empty if all features are disabled and no dates were supplied}
+        warnings:
+          type: array
+          description: Warnings for invalid or unavailable enabled features; empty for complete responses.
+          items: {$ref: '#/components/schemas/CardsWarning'}
+        scope_code: {type: string}
+        features:
+          type: object
+          description: All configured features, keyed by lowercase feature code.
+          additionalProperties: {$ref: '#/components/schemas/CardsFeature'}
+    UniverseRequest:
+      type: object
+      additionalProperties: false
+      description: Omit both dates for the latest default range, or supply both as inclusive ISO dates.
+      properties:
+        start_date: {type: string, default: '', example: ''}
+        end_date: {type: string, default: '', example: ''}
+    UniverseMetric:
+      type: object
+      required: [count]
+      properties:
+        label: {type: string}
+        count: {type: integer, format: int64, nullable: true}
+        percent: {type: number, format: double, description: Ratio from 0 to 1; omitted when denominator unavailable}
+        growth: {type: number, format: double, description: Signed growth ratio; omitted without a comparable baseline}
+        compare: {type: integer, format: int64, description: Signed acquisition delta}
+    UniverseScope:
+      type: object
+      required: [scope_code, display_name]
+      properties:
+        scope_code: {type: string}
+        display_name: {type: string}
+    UniverseOpco:
+      type: object
+      required: [scope_code, is_enabled, data]
+      properties:
+        scope_code: {type: string}
+        is_enabled: {type: boolean}
+        data_status: {type: string, enum: [stale, missing], description: Present only on an enabled card with a data issue}
+        data:
+          type: object
+          nullable: true
+          allOf: [{$ref: '#/components/schemas/UniverseOpcoData'}]
+    UniverseOpcoData:
+      type: object
+      required: [total_retail_count, member, non_member]
+      properties:
+        total_retail_count: {type: integer, format: int64, nullable: true}
+        member: {$ref: '#/components/schemas/UniverseMetric'}
+        non_member: {$ref: '#/components/schemas/UniverseMetric'}
+    UniverseMetricChart:
+      type: object
+      example: {is_enabled: true, data: null, data_status: stale}
+      required: [is_enabled, data]
+      properties:
+        is_enabled: {type: boolean}
+        data_status: {type: string, enum: [stale, missing], description: Present only on an enabled chart with a data issue}
+        data: {type: object, nullable: true, allOf: [{$ref: '#/components/schemas/UniverseMetric'}]}
+    UniverseMetricListChart:
+      type: object
+      example: {is_enabled: true, data: [{label: '2026', count: 42}], data_status: partial}
+      required: [is_enabled, data]
+      properties:
+        is_enabled: {type: boolean}
+        data_status: {type: string, enum: [stale, missing, partial], description: Present only on an enabled chart with a data issue}
+        data: {type: array, nullable: true, items: {$ref: '#/components/schemas/UniverseMetric'}}
+    UniverseActivity:
+      type: object
+      required: [active, inactive]
+      properties:
+        active: {$ref: '#/components/schemas/UniverseMetric'}
+        inactive: {$ref: '#/components/schemas/UniverseMetric'}
+    UniverseActivityChart:
+      type: object
+      required: [is_enabled, data]
+      properties:
+        is_enabled: {type: boolean}
+        data_status: {type: string, enum: [stale, missing], description: Present only on an enabled chart with a data issue}
+        data: {type: object, nullable: true, allOf: [{$ref: '#/components/schemas/UniverseActivity'}]}
+    UniverseMatrix:
+      type: object
+      required: [columns, rows]
+      properties:
+        columns: {type: array, items: {type: string}}
+        rows:
+          type: array
+          items:
+            type: object
+            required: [primary_entity, relationships]
+            properties:
+              primary_entity: {$ref: '#/components/schemas/UniverseMetric'}
+              relationships: {type: array, items: {$ref: '#/components/schemas/UniverseMetric'}}
+    UniverseMatrixChart:
+      type: object
+      required: [is_enabled, data]
+      properties:
+        is_enabled: {type: boolean}
+        data_status: {type: string, enum: [stale, missing], description: Present only on an enabled chart with a data issue}
+        data: {type: object, nullable: true, allOf: [{$ref: '#/components/schemas/UniverseMatrix'}]}
+    UniverseResponse:
+      type: object
+      required: [status, warnings, start_date, end_date, as_of_date, as_of_dates, scopes, group, opcos]
+      properties:
+        status: {type: string, enum: [complete, partial]}
+        start_date: {type: string, format: date}
+        end_date: {type: string, format: date}
+        warnings:
+          type: array
+          items: {$ref: '#/components/schemas/UniverseWarning'}
+        as_of_date: {type: string, format: date, description: Newest successfully included chart date; empty when all charts are missing}
+        as_of_dates:
+          type: object
+          properties:
+            group: {type: object, additionalProperties: {type: string, format: date, nullable: true}}
+            opcos: {type: object, additionalProperties: {type: string, format: date, nullable: true}}
+        scopes: {type: array, items: {$ref: '#/components/schemas/UniverseScope'}}
+        group:
+          type: object
+          required: [total_members, latest_member_growth, member_activity, member_penetration_retail, non_member_transaction_retail, annual_member_acquisition, entity_member_count, member_matrix_activity]
+          properties:
+            total_members: {$ref: '#/components/schemas/UniverseMetricChart'}
+            latest_member_growth: {$ref: '#/components/schemas/UniverseMetricChart'}
+            member_activity: {$ref: '#/components/schemas/UniverseActivityChart'}
+            member_penetration_retail: {$ref: '#/components/schemas/UniverseMetricChart'}
+            non_member_transaction_retail: {$ref: '#/components/schemas/UniverseMetricChart'}
+            annual_member_acquisition: {$ref: '#/components/schemas/UniverseMetricListChart'}
+            entity_member_count: {$ref: '#/components/schemas/UniverseMetricListChart'}
+            member_matrix_activity: {$ref: '#/components/schemas/UniverseMatrixChart'}
+        opcos: {type: array, items: {$ref: '#/components/schemas/UniverseOpco'}}
+    UniverseWarning:
+      type: object
+      required: [chart, code, message]
+      properties:
+        chart: {type: string, description: Stable chart identifier}
+        scope_code: {type: string, description: Present for a failed Op-Co card}
+        code: {type: string, enum: [CHART_DATA_INVALID]}
+        message: {type: string, description: Safe user-facing warning without internal details}
+    ErrorResponse:
+      type: object
+      required: [success, errors]
+      properties:
+        success: {type: boolean, enum: [false]}
+        trace_id: {type: string, description: Matches the X-Trace-ID response header}
+        errors:
+          type: object
+          required: [code, message]
+          properties:
+            code: {type: string, description: Stable application error code; authentication uses `401` and `503`}
+            message: {type: string}
+  responses:
+    UnauthorizedError:
+      description: Missing or invalid bearer token; error code `401` and message `unauthorized`
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/ErrorResponse'}
+          example:
+            success: false
+            errors: {code: '401', message: unauthorized}
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

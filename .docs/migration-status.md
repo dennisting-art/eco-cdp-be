@@ -2,25 +2,29 @@
 
 This repository has fresh Git history. The legacy `cdp-be` and `acs-cdp-be` checkouts were read only. No legacy service is a build or runtime dependency.
 
-The ecodai service is self-contained under `services/ecodai/`: its Go module, internal packages, platform helpers, SQL, migrations, API contract, Dockerfiles, CI includes, and local scripts live there. Root `.gitlab-ci.yml` only triggers its child pipelines. The local synthetic seed at `services/ecodai/seed/` is ignored by Git.
+The ecodai service lives under `services/ecodai/` and depends on the shared root `pkg/` Go module for HTTP server setup, responses, common errors, and logging. Its service-specific code, SQL, migrations, API contract, Dockerfiles, CI includes, and local scripts remain under `services/ecodai/`. The service image builds from the repository root so both modules are available. Root `.gitlab-ci.yml` triggers its child pipelines. The local synthetic seed at `services/ecodai/seed/` is ignored by Git.
 
 ## Approved contract and release order
 
-The user confirmed `cdphub.cust_intel.view` for every Customer Intelligence and segment v0 route, including segment writes and exports for now. The plan's `acs_cdp.*` and `aud_build` entries were examples, not approved permission tags. The first release implements the first four rows below. Segment operations remain in the later release.
+The user confirmed `cdphub.cust_intel.view` for Customer Intelligence and the segment list, get, create, and estimate/confirm routes, including segment writes and exports. A later instruction makes segment request-status polling accessible to anyone holding the request ID, without a token, operation permission, requester check, or route-specific rate limit. The plan's `acs_cdp.*` and `aud_build` entries were examples, not approved permission tags. The segment schema and feature runtime have been implemented for a later release behind default-off API and worker switches; no production stage has been deployed.
 
 | Method and path | Body or parameters | Response data | Permission | Current consumer and public URL |
 | --- | --- | --- | --- | --- |
-| `POST /api/v0/customer-intelligence/cards` | JSON `scope_code`; omitted, null, or empty selects AEON | status, warnings, scope_code, configured features | `cdphub.cust_intel.view` | CDP Hub; legacy dev/UAT gateway uses `/contextiq` prefix; ecodai gateway path pending owner confirmation |
-| `POST /api/v0/customer-intelligence/universe` | JSON `start_date`, `end_date`; nonblank dates rejected | latest chart dates, scopes, group, opcos, warnings | `cdphub.cust_intel.view` | CDP Hub; ecodai gateway path pending owner confirmation |
+| `POST /api/v0/customer-intelligence/cards` | JSON `scope_code`, optional `start_date` and `end_date`; omitted, null, or empty scope selects AEON | resolved dates, status, warnings, scope code, configured features with chart-level data status when needed | `cdphub.cust_intel.view` | CDP Hub; legacy dev/UAT gateway uses `/contextiq` prefix; ecodai gateway path pending owner confirmation |
+| `POST /api/v0/customer-intelligence/universe` | Optional paired `start_date` and `end_date` | resolved dates, chart dates, scopes, group, opcos, chart-level data status when needed | `cdphub.cust_intel.view` | CDP Hub; ecodai gateway path pending owner confirmation |
 | `GET /api/v0/internal/access` | Bearer token | `allowed: true` for accepted token | valid token; no operation grant | Internal access client; legacy gateway uses `/users` prefix; ecodai gateway path pending owner confirmation |
 | `POST /api/v0/internal/self-pilot/token` | Empty body or `{}` | token, type, expiry, profile | no caller grant; non-production and internal network only | Internal test clients; ecodai gateway path pending owner confirmation |
 | `GET /api/v0/segments/list` | `page`, `pageSize`, `search`, `tags` | segments, page, pageSize, total | `cdphub.cust_intel.view` | CDP Hub; later release |
 | `GET /api/v0/segments/{id}` | segment ID | segment definition | `cdphub.cust_intel.view` | CDP Hub; later release |
 | `POST /api/v0/segments` | name, tags, description, operation, filters | created segment | `cdphub.cust_intel.view` | CDP Hub; later release |
 | `POST /api/v0/segments/requests` | mode and segment selections; `Idempotency-Key` for confirmation | estimate or request ID/status | `cdphub.cust_intel.view` | CDP Hub; later release |
-| `GET /api/v0/segments/requests/{request_id}` | request ID | status and, when ready, counts and bucket | `cdphub.cust_intel.view` | CDP Hub; later release |
+| `GET /api/v0/segments/requests/{request_id}` | request ID | status and, when ready, counts and bucket | request ID only; no token or permission | CDP Hub; later release |
 
-The route catalogs match these nine methods and paths. The legacy ContextIQ v0 OpenAPI omits `/api/v0/internal/access`; UserMS OpenAPI defines it. Segment OpenAPI still says only a valid bearer token is required and underspecifies body and response shapes; update those contract details before registering segment routes. The first-release OpenAPI in this repository contains only registered v0 routes. Organization-level authorization is deferred. Segment writes require a stable UUID mapping from Partner Portal `sub` and object checks before that release; the current Partner Portal `sub` has not been verified as the required UUID.
+The route catalogs match these nine methods and paths. The legacy ContextIQ v0 OpenAPI omits `/api/v0/internal/access`; UserMS OpenAPI defines it. The eco OpenAPI now documents the five segment routes, including unauthenticated request-status polling. The API stores the caller's subject as text; production stability and ownership of Partner Portal subjects still need verification. Organization-level authorization is deferred.
+
+The later approved local segment catalogue uses one reserved category tag per visible row: `predefine`, `custom`, or `attribute`. Migration `000004_attribute_segments` removes the old `type` response field, adds the attribute rule fields, and is applied only to the local test database so far. The 27 attribute rows and their shared all-members snapshot are synthetic local fixtures, not a production feed.
+
+The v0 error envelope uses `errors.code` as a stable string. Missing or invalid bearer tokens return `401` with message `unauthorized`; an authentication provider failure returns `503` with message `service unavailable`. These numeric-string codes standardize the earlier invalid-token `Unauthorized` and provider-failure `Service Unavailable` values. Clients that branch on those earlier values must switch to `401` and `503` before cutover. HTTP statuses remain 401 and 503 respectively. Customer Intelligence data failures can also return HTTP 503 with feature-specific `930xx` codes.
 
 ## Provenance and disposition
 
@@ -28,15 +32,15 @@ User approval in this session covers adapting Customer Intelligence source and S
 
 | Material | Origin | Decision |
 | --- | --- | --- |
-| Cards and Universe domain, DTO, service, repository, SQL, HTTP handlers and mapper; service tests | `cdp-be/services/contextiq/internal/` | Adapted into `services/ecodai/internal/`; imports, logging and module boundary changed. No other ContextIQ domains included. |
+| Cards and Universe domain, DTO, service, repository, SQL, HTTP handlers and mapper; service tests | `cdp-be/services/contextiq/internal/` | Adapted into `services/ecodai/internal/features/customerintelligence/`; imports, logging and module boundary changed. No other ContextIQ domains included. |
 | Customer Intelligence schema, view, functions, trigger and matrix feature seed | `cdp-be/migrations/000057_contextiq_customer_intelligence_universe.{up,down}.sql` | Adapted as fresh `000001_customer_intelligence`. Includes only reporting schema. |
 | Customer Intelligence scopes, feature catalog, buckets and enablement | `cdp-be/migrations/000058_seed_ecosystem_scope_features.{up,down}.sql` | Adapted as `services/ecodai/migrations/000002_seed_ecosystem_scope_features`. The rollback retains `MEMBER_MATRIX_ACTIVITY` from `000001`. |
-| Synthetic Universe fixture | `cdp-be/scripts/seed_customer_intelligence_universe_local.sql` | Retained only under repository testdata; never production seed. |
+| Synthetic Universe fixture | `cdp-be/scripts/seed_customer_intelligence_universe_local.sql` | Retained only under `internal/features/customerintelligence/postgres/testdata/`; never production seed. |
 | First-release OpenAPI | `cdp-be/services/contextiq/docs/openapi-v0.yaml`, UserMS access spec | Adapted; removed segment routes and legacy server URLs, added access route. |
 | RS256/JWKS validator and its tests | `acs-cdp-be/services/custms/internal/auth/jwks_validator{,_test}.go` | Adapted; bearer token no longer sent to public JWKS; future `iat` rejected. |
 | Self-Pilot issuer and verifier | `cdp-be/services/userms/internal/selfpilot/selfpilot.go` | Adapted to eco audience, scope and independent configuration. |
 | Permission lookup and cache | Partner Portal interface described by ACS auth integration reference | Rewritten; caches the full effective permission set by token hash, revalidates JWT on every request. |
-| `gin`, `pgx`, `uuid` | Existing dependencies in the reference repositories | Retained as direct Go module dependencies; module download uses public upstream modules, not legacy artifacts. |
+| `echo`, `pgx`, `uuid` | Existing dependencies in the reference repositories | Echo replaced Gin for the HTTP runtime; pgx and uuid remain direct Go dependencies. Module download uses public upstream modules, not legacy artifacts. |
 | `userms`, `taskms`, `eventms`, legacy `/api/v1`, segment schema and worker, customer-specific ACS schema/API | Legacy repositories | Excluded from first release. |
 | Production reporting facts, member cookbook, segment definitions, in-flight requests | Legacy database or upstream pipelines; ownership still unconfirmed | Excluded from repository. Migration and reconciliation are pending approved data owners. |
 
@@ -48,7 +52,7 @@ User approval in this session covers adapting Customer Intelligence source and S
 
 The service and migration Docker images built locally from this repository. The service image started against the disposable database; readiness returned 200 and a Self-Pilot authenticated Universe request returned `status=complete`, four OpCo cards, and a matrix. This confirms a local smoke path only, not Partner Portal or public gateway behavior.
 
-The repository only contains local synthetic scripts for Customer Intelligence; no production loader or owning data pipeline was found in `cdp-be`. The team must identify who populates every reporting table, provision initial data into the dedicated eco database, and keep it fresh after cutover. For the later release, the member cookbook's local import script is only a test helper; the production feed owner remains unknown. Segment definitions, member attributes, requests, identifiers and sequence values require a separate migration and reconciliation plan.
+The repository contains local synthetic fixtures for Customer Intelligence and segments, including a repeatable million-member segment scale fixture. No production loader or owning data pipeline was found in `cdp-be`. The segment migration and API are implemented and locally tested; production data loading is a later data-team handoff, not a blocker to the current implementation or deployment of the schema with segment switches off. Before enabling traffic on real data, confirm the feed's member IDs and consent semantics and ensure the latest `computed_date` is a complete membership snapshot. Ongoing ownership, refresh monitoring, and reconciliation belong in that production handoff and release runbook. Historical ContextIQ data and active requests need migration only if they must remain available after cutover.
 
 The external gateway configuration is in `cdp-k8s-manifests/overlays/{dev,uat,prep,prod}/kong-ingress/cdphub-service.yml`. The ingress currently routes `/contextiq` and `/users` by broad prefixes to legacy services and strips the matched path. Its `CODEOWNERS` assigns ingress changes to `@akmal.harith`. A new rule must preserve the public v0 path and the service's `/api/v0/...` upstream path without stealing legacy `/api/v1` traffic. No gateway file was changed.
 

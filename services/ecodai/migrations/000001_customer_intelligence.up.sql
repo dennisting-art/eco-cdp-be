@@ -19,7 +19,7 @@ CREATE TABLE feature_summary (
     display_name VARCHAR(100) NOT NULL,
     description VARCHAR(255),
     display_order SMALLINT NOT NULL,
-    feature_type TEXT CHECK (
+    feature_type TEXT NOT NULL CHECK (
         feature_type IN ('TREND', 'DISTRIBUTION', 'COMBO_TREND', 'MATRIX')
     ),
     feature_context TEXT NOT NULL DEFAULT 'CARDS'

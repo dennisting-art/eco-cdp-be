@@ -5,15 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/pkg/logger"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
-
-	"gitlab.com/aeon360/internal/tech-team/data-and-ai/eco-cdp-be/services/ecodai/internal/platform/permission"
 )
 
 var ErrPermissionDenied = errors.New("permission denied")
@@ -53,7 +51,7 @@ func NewAuthorizer(validator tokenValidator, source permissionSource, ttl time.D
 func (a *Authorizer) Authenticate(ctx context.Context, token string) (Identity, error) {
 	validationStarted := time.Now()
 	claims, err := a.validator.Validate(ctx, token)
-	slog.Info("auth_jwt_validation", "duration_ms", time.Since(validationStarted).Milliseconds(), "ok", err == nil)
+	logger.Info(ctx, "auth_jwt_validation", "duration_ms", time.Since(validationStarted).Milliseconds(), "ok", err == nil)
 	if err != nil {
 		return Identity{}, err
 	}
@@ -63,12 +61,12 @@ func (a *Authorizer) Authenticate(ctx context.Context, token string) (Identity, 
 	cached, ok := a.cache[key]
 	a.mu.Unlock()
 	if ok && now.Before(cached.expires) {
-		slog.Info("auth_permission_lookup", "duration_ms", 0, "cache_hit", true)
+		logger.Info(ctx, "auth_permission_lookup", "duration_ms", 0, "cache_hit", true)
 		return Identity{Subject: claims.Subject, Permissions: append([]string(nil), cached.permissions...)}, nil
 	}
 	lookupStarted := time.Now()
 	permissions, err := a.source.Resolve(ctx, token)
-	slog.Info("auth_permission_lookup", "duration_ms", time.Since(lookupStarted).Milliseconds(), "cache_hit", false, "ok", err == nil)
+	logger.Info(ctx, "auth_permission_lookup", "duration_ms", time.Since(lookupStarted).Milliseconds(), "cache_hit", false, "ok", err == nil)
 	if err != nil {
 		return Identity{}, err
 	}
@@ -94,7 +92,7 @@ func (a *Authorizer) Authenticate(ctx context.Context, token string) (Identity, 
 }
 
 func Allows(identity Identity, required string) bool {
-	return permission.Allows(identity.Permissions, required)
+	return AllowsGrants(identity.Permissions, required)
 }
 
 type IntrospectionClient struct {

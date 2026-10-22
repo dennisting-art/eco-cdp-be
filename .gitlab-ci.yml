@@ -10,6 +10,9 @@ ecodai-pipeline:
   rules:
     - changes:
         - .gitlab-ci.yml
+        - go.work
+        - go.work.sum
+        - pkg/**/*
         - services/**/*
 
 migration-image-pipeline:

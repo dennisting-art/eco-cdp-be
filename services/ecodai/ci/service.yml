@@ -6,6 +6,6 @@ include:
       image_name: ecodai
       repository_name: repo-ecocdphub-svc
       file: services/ecodai/Dockerfile
-      context_path: "services/ecodai"
+      context_path: "."
       dev_branch: develop
       uat_branch: staging
